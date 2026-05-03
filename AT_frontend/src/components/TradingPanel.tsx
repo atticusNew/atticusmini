@@ -317,13 +317,15 @@ interface TradingPanelProps {
 
 interface TradeData {
   id: string;
-  positionId: number; // ✅ ADDED: Store actual backend position ID for settlement
+  positionId: number;
   entryPrice: number;
-  strikeOffset: number; // ✅ FIXED: Use strike offset instead of strike price
+  strikeOffset: number;
   startTime: number;
   expiry: string;
   type: 'call' | 'put';
   amount: number;
+  /** Payout multiple frozen at submit time so settlement matches what the user saw. */
+  quotedPayoutMultiple?: number;
 }
 
 export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode = false, onConnectWallet, shouldOpenHelp, onHelpOpened }) => {
@@ -433,14 +435,14 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
         isCall: currentTradeData.type === 'call'
       });
       
-      // ✅ NEW: Use off-chain settlement (fast, accurate, uniform)
-      const result = await pricingEngine.calculateSettlement(
+      const result = pricingEngine.calculateSettlement(
         currentTradeData.type,
         currentTradeData.strikeOffset,
         currentTradeData.expiry,
         currentPrice,
         currentTradeData.entryPrice,
-        currentTradeData.amount // ✅ FIXED: Pass contract count
+        currentTradeData.amount,
+        currentTradeData.quotedPayoutMultiple,
       );
       
       // ✅ RECORD: Send result to backend for storage only
@@ -719,12 +721,13 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
       const tradeData: TradeData = {
         id: orderId.toString(),
         positionId: orderId,
-        entryPrice: tradeStartPrice || 0, // ✅ FIXED: Prevent undefined crash with fallback
-        strikeOffset: finalStrikeOffset, // ✅ FIXED: Use strike offset instead of strike price
+        entryPrice: result.entryPrice ?? tradeStartPrice ?? 0,
+        strikeOffset: finalStrikeOffset,
         startTime: Date.now(),
-        expiry: finalExpiry,  // ✅ Use final expiry
+        expiry: finalExpiry,
         type: finalOptionType,
-        amount: contracts
+        amount: contracts,
+        quotedPayoutMultiple: result.quotedPayoutMultiple,
       };
 
 
