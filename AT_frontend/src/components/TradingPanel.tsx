@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import styled from 'styled-components';
 import { useSynchronizedPrice } from '../hooks/useGlobalPriceFeed';
 import { TradeForm } from './TradeForm';
+import { FirstTradeHint } from './FirstTradeHint';
+import { useFirstTradeHint } from '../hooks/useFirstTradeHint';
 import { PriceChart } from './PriceChart';
 import { CountdownPill } from './CountdownPill';
 import { DemoPill } from './DemoPill';
@@ -384,6 +386,7 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
   const { user } = useAuth();
   const { refreshBalance } = useBalance();
   const { showOnboarding, handleClose, handleDontShowAgain } = useOnboarding(isDemoMode);
+  const { dismiss: dismissFirstTradeHint } = useFirstTradeHint();
 
   const [activeTab, setActiveTab] = useState<'trade' | 'positions' | 'account'>('trade');
   const [optionType, setOptionType] = useState<'call' | 'put' | null>(null);
@@ -728,6 +731,8 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
       refreshBalance().catch(() => {});
       setActiveTab('trade');
       scrollChartIntoView();
+      dismissFirstTradeHint();
+
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('❌ Failed to start trade:', errorMessage);
@@ -883,19 +888,22 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
                     );
                   })()
                 ) : (
-                  <TradeForm
-                    currentPrice={priceState.current}
-                    optionType={optionType}
-                    strikeOffset={strikeOffset}
-                    isTradeActive={tradeState.isActive}
-                    isTradeInProgress={tradeState.isInProgress}
-                    onOptionTypeSelect={handleOptionTypeSelect}
-                    onStrikeOffsetSelect={handleStrikeOffsetSelect}
-                    onExpirySelect={handleExpirySelect}
-                    onTradeStart={handleTradeStart}
-                    isConnected={isFullyConnected}
-                    isDemoMode={isDemoMode}
-                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '8px 0' }}>
+                    <FirstTradeHint />
+                    <TradeForm
+                      currentPrice={priceState.current}
+                      optionType={optionType}
+                      strikeOffset={strikeOffset}
+                      isTradeActive={tradeState.isActive}
+                      isTradeInProgress={tradeState.isInProgress}
+                      onOptionTypeSelect={handleOptionTypeSelect}
+                      onStrikeOffsetSelect={handleStrikeOffsetSelect}
+                      onExpirySelect={handleExpirySelect}
+                      onTradeStart={handleTradeStart}
+                      isConnected={isFullyConnected}
+                      isDemoMode={isDemoMode}
+                    />
+                  </div>
                 )}
               </ErrorBoundary>
             )}
