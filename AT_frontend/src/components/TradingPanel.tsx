@@ -163,24 +163,42 @@ const MainContent = styled.div`
   }
 `;
 
+const PaperBanner = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px 10px;
+  margin: 4px 8px 0;
+  background: rgba(245,195,68,0.10);
+  border: 1px solid rgba(245,195,68,0.32);
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+`;
+
 const ChartSection = styled.div`
-  flex-shrink: 0; /* ✅ FIX: Don't shrink on mobile */
-  height: 450px;
+  flex-shrink: 0;
+  height: clamp(220px, 38vh, 360px);
   display: flex;
   flex-direction: column;
-  padding: 0.25rem;
-  margin-top: 0.5rem; /* ✅ FIX: Reduced margin to bring options section closer */
+  padding: 4px 8px 0;
+  margin-top: 0;
   position: relative;
 
   @media (min-width: 768px) {
-    flex: 1; /* Take available space on desktop */
+    flex: 1;
     height: auto;
-    min-height: 400px;
-    max-height: 500px; /* ✅ FIX: Prevent chart from expanding beyond this height */
-    max-width: calc(100vw - 450px); /* ✅ FIX: Account for sidebar width (400px + padding) */
-    padding: 0.5rem;
-    margin-top: 1rem; /* Reduced desktop margin too */
-    overflow: hidden; /* ✅ FIX: Prevent content overflow */
+    min-height: 360px;
+    max-height: 520px;
+    max-width: calc(100vw - 410px);
+    padding: 8px 10px 0;
+    margin-top: 4px;
+    overflow: hidden;
   }
 `;
 
@@ -803,6 +821,7 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
       </Header>
 
       <MainContent>
+        {isDemoMode && <PaperBanner>Paper · No real money at stake</PaperBanner>}
         <ChartSection data-chart-section>
           <ErrorBoundary fallback={<div>Chart temporarily unavailable</div>}>
             <PriceChart {...chartProps} />
