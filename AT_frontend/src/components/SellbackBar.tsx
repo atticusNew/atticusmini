@@ -61,6 +61,16 @@ const Reason = styled.div`
   font-style: italic;
 `;
 
+const LockoutHint = styled.span<{ tone: 'normal' | 'warn' }>`
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  font-weight: 600;
+  color: ${p => (p.tone === 'warn' ? 'var(--accent)' : 'var(--text-dim)')};
+  margin-left: 8px;
+  letter-spacing: 0.04em;
+`;
+
 const SellButton = styled.button`
   appearance: none;
   background: var(--accent);
@@ -125,10 +135,20 @@ export const SellbackBar: React.FC<SellbackBarProps> = ({ ticketId, spotUSD, onS
     }
   };
 
+  const lockoutTone: 'normal' | 'warn' =
+    quote.secondsUntilLockout > 0 && quote.secondsUntilLockout <= 10 ? 'warn' : 'normal';
+
   return (
     <Bar>
       <Left>
-        <Title>Sell now</Title>
+        <Title>
+          Sell now
+          {quote.available && quote.secondsUntilLockout > 0 && (
+            <LockoutHint tone={lockoutTone}>
+              · locks in {quote.secondsUntilLockout}s
+            </LockoutHint>
+          )}
+        </Title>
         {quote.available ? (
           <Numbers tone={tone}>
             ${formatUSD(refund)}
