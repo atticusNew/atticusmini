@@ -1,9 +1,12 @@
 /**
  * ActiveTicketCard — row format for the active position.
  *
- * v3: matches the form's label-left/value-right layout. Three rows
- * (Worth now / PnL / countdown header), one full-width sell button,
- * lockout hint when the sell-back window is closing.
+ * v3: matches the form's label-left/value-right layout.
+ *
+ * v4: three body rows (If you win / Worth now / PnL) so the trader
+ * can directly compare the hold-to-expiry payout vs the take-it-now
+ * sell-back vs the current floating PnL. Header carries the deal
+ * (direction · target) and the countdown.
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
@@ -67,8 +70,8 @@ const HeaderTarget = styled.span`
 const Timer = styled.div<{ tone: 'normal' | 'warn' | 'critical' }>`
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
-  font-size: 16px;
+  font-weight: 800;
+  font-size: 18px;
   color: ${p =>
     p.tone === 'critical' ? 'var(--down)' : p.tone === 'warn' ? 'var(--accent)' : 'var(--text)'};
 `;
@@ -135,7 +138,7 @@ const formatRemaining = (s: number): string => {
 export const ActiveTicketCard: React.FC<ActiveTicketCardProps> = props => {
   const {
     ticketId, spotUSD, optionType, strikePrice, entryPrice: _entryPrice, tenor,
-    stake: _stake, potentialPayout: _potentialPayout, onSold,
+    stake: _stake, potentialPayout, onSold,
   } = props;
 
   const [ticket, setTicket] = useState<PartnerTicket | null>(null);
@@ -206,6 +209,13 @@ export const ActiveTicketCard: React.FC<ActiveTicketCardProps> = props => {
         </div>
         <Timer tone={timerTone}>{formatRemaining(remaining)}</Timer>
       </HeaderRow>
+
+      <FormRow>
+        <FormRowLabel>If you win</FormRowLabel>
+        <FormRowControl>
+          <RowValue tone="pos">${formatUSD(potentialPayout)}</RowValue>
+        </FormRowControl>
+      </FormRow>
 
       <FormRow>
         <FormRowLabel>Worth now</FormRowLabel>
