@@ -8,6 +8,7 @@ node_modules/
 # Build output
 AT_frontend/dist/
 AT_frontend/build/
+dist/
 
 # Env
 **/.env
