@@ -784,7 +784,7 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
             isDemoMode={isDemoMode}
             onClick={handleDisconnectClick}
           >
-            {isDemoMode ? 'Exit' : (isFullyConnected ? 'Disconnect' : 'Reconnect')}
+            {isDemoMode ? 'Exit demo' : (isFullyConnected ? 'Disconnect' : 'Reconnect')}
           </DisconnectButton>
         </div>
       </Header>
