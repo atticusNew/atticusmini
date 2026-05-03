@@ -6,6 +6,7 @@ import { PriceChart } from './PriceChart';
 import { TimerDisplay } from './TimerDisplay';
 import { SellbackCard } from './SellbackCard';
 import { SimpleTradeHistory } from './SimpleTradeHistory';
+import { ActiveTicketsList } from './ActiveTicketsList';
 import { OnboardingModal } from './OnboardingModal';
 import { ErrorBoundary } from './ErrorBoundary';
 import { useCanister } from '../contexts/CanisterProvider';
@@ -1182,8 +1183,14 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
             )}
 
             {activeTab === 'positions' && (
-              <ErrorBoundary fallback={<div>Trade history unavailable</div>}>
-                <SimpleTradeHistory />
+              <ErrorBoundary fallback={<div>Positions unavailable</div>}>
+                <div>
+                  <ActiveTicketsList
+                    spotUSD={priceState.current}
+                    onChanged={() => { refreshBalance().catch(() => {}); }}
+                  />
+                  <SimpleTradeHistory />
+                </div>
               </ErrorBoundary>
             )}
 
