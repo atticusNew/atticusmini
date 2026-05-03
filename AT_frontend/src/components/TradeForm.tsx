@@ -207,46 +207,31 @@ const StakeValue = styled.div`
 `;
 
 /**
- * v2: Risk → Win panel.
- *
- * Hero is the Win number (green, mono, 24px). Risk sits underneath
- * as a small subtitle. We dropped the multiplier (still on the
- * strike chip) and the arrow glyph (visually noisy for a novice).
+ * v3: Risk → Win is a single centered sentence — no card, no border.
+ * The risk number is dim, the win number is the green emphasis.
+ * Same data as the v2 panel, half the visual weight.
  */
-const RiskRewardPanel = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 14px 14px 12px;
-  background: var(--bg-elev-2);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+const RiskWinLine = styled.div`
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--text-dim);
+  padding: 4px 0;
+  line-height: 1.3;
 
+  .risk {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    font-weight: 700;
+  }
   .win {
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
     color: var(--up);
     font-weight: 800;
-    font-size: 28px;
-    line-height: 1;
-    letter-spacing: 0.01em;
-  }
-  .winLabel {
-    font-family: var(--font-sans);
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--up);
-    opacity: 0.8;
-  }
-  .risk {
-    font-family: var(--font-mono);
-    font-variant-numeric: tabular-nums;
-    color: var(--text-dim);
-    font-size: 12px;
-    margin-top: 4px;
+    font-size: 17px;
   }
 `;
 
@@ -476,11 +461,10 @@ export const TradeForm: React.FC<TradeFormProps> = ({
 
       <Stack gap={10}>
         {live && optionType && (
-          <RiskRewardPanel>
-            <span className="winLabel">If you win</span>
-            <span className="win">${formatUSD(live.potentialPayoutUSD.toNumber())}</span>
-            <span className="risk">Risk ${formatUSD(live.premiumUSD.toNumber())}</span>
-          </RiskRewardPanel>
+          <RiskWinLine aria-live="polite">
+            Risk <span className="risk">${formatUSD(live.premiumUSD.toNumber())}</span>
+            {' '}to win <span className="win">${formatUSD(live.potentialPayoutUSD.toNumber())}</span>
+          </RiskWinLine>
         )}
 
         {errorMsg && <ErrorLine>{errorMsg}</ErrorLine>}
