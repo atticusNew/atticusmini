@@ -171,21 +171,48 @@ const StakeValue = styled.div`
   color: var(--text);
 `;
 
-const RiskRewardLine = styled.div`
+/**
+ * v2: Risk → Win panel.
+ *
+ * Hero is the Win number (green, mono, 24px). Risk sits underneath
+ * as a small subtitle. We dropped the multiplier (still on the
+ * strike chip) and the arrow glyph (visually noisy for a novice).
+ */
+const RiskRewardPanel = styled.div`
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  padding: 12px 14px;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 14px 14px 12px;
   background: var(--bg-elev-2);
   border: 1px solid var(--border);
   border-radius: 12px;
 
-  .label { color: var(--text-dim); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; }
-  .pair { display: flex; align-items: baseline; gap: 8px; }
-  .risk { color: var(--text-dim); font-family: var(--font-mono); }
-  .arrow { color: var(--text-muted); }
-  .win { color: var(--up); font-family: var(--font-mono); font-weight: 700; font-size: 18px; }
-  .multiplier { color: var(--text-dim); font-family: var(--font-mono); font-size: 12px; margin-left: 4px; }
+  .win {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--up);
+    font-weight: 800;
+    font-size: 28px;
+    line-height: 1;
+    letter-spacing: 0.01em;
+  }
+  .winLabel {
+    font-family: var(--font-sans);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--up);
+    opacity: 0.8;
+  }
+  .risk {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-dim);
+    font-size: 12px;
+    margin-top: 4px;
+  }
 `;
 
 const Cta = styled(Button).attrs({ variant: 'primary' as const, size: 'lg' as const })`
@@ -415,22 +442,11 @@ export const TradeForm: React.FC<TradeFormProps> = ({
 
       <Stack gap={10}>
         {live && optionType && (
-          <RiskRewardLine>
-            <span className="label">Risk → Win</span>
-            <span className="pair">
-              <span className="risk">${formatUSD(live.premiumUSD.toNumber())}</span>
-              <span className="arrow">→</span>
-              <span className="win">${formatUSD(live.potentialPayoutUSD.toNumber())}</span>
-              <span className="multiplier">{live.payoutMultiple.toFixed(2)}×</span>
-            </span>
-          </RiskRewardLine>
-        )}
-
-        {live && optionType && (
-          <ContextLine>
-            wins if BTC {direction === 'call' ? '≥' : '≤'}{' '}
-            <span className="strike">${formatUSD(live.strikeUSD)}</span> in {tenor}
-          </ContextLine>
+          <RiskRewardPanel>
+            <span className="winLabel">If you win</span>
+            <span className="win">${formatUSD(live.potentialPayoutUSD.toNumber())}</span>
+            <span className="risk">Risk ${formatUSD(live.premiumUSD.toNumber())}</span>
+          </RiskRewardPanel>
         )}
 
         {errorMsg && <ErrorLine>{errorMsg}</ErrorLine>}
