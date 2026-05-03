@@ -2,7 +2,6 @@ import React from 'react';
 import styled from 'styled-components';
 import { TradingPanel } from './TradingPanel';
 import { useAuth, AuthProvider } from '../contexts/AuthProvider';
-import { TradeProvider } from '../contexts/TradeContext';
 import { CanisterProvider } from '../contexts/CanisterProvider';
 import { BalanceProvider } from '../contexts/BalanceProvider';
 import { ToastProvider } from './ToastProvider';
@@ -82,9 +81,7 @@ export const App: React.FC = () => (
   <CanisterProvider>
     <AuthProvider>
       <BalanceProvider>
-        <TradeProvider>
-          <AppContent />
-        </TradeProvider>
+        <AppContent />
       </BalanceProvider>
     </AuthProvider>
   </CanisterProvider>

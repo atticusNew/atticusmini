@@ -847,10 +847,6 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
     ...(tradeState.entryPrice !== undefined && { entryPrice: tradeState.entryPrice })
   };
 
-  // ✅ REMOVED: Unused activeTradeData variable that was causing build error
-
-  useBalance();
-
   return (
     <TradingContainer>
       <Header>
@@ -870,7 +866,7 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
           isDemoMode={isDemoMode}
           onClick={handleDisconnectClick}
         >
-          {isDemoMode ? 'Connect' : (isFullyConnected ? 'Disconnect' : 'Reconnect')}
+          {isDemoMode ? 'Exit demo' : (isFullyConnected ? 'Disconnect' : 'Reconnect')}
         </DisconnectButton>
       </Header>
 
