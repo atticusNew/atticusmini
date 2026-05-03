@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import styled from 'styled-components';
 import { useSynchronizedPrice } from '../hooks/useGlobalPriceFeed';
 import { TradeForm } from './TradeForm';
+import { FirstTradeHint } from './FirstTradeHint';
+import { useFirstTradeHint } from '../hooks/useFirstTradeHint';
 import { PriceChart } from './PriceChart';
 import { CountdownPill } from './CountdownPill';
 import { DemoPill } from './DemoPill';
@@ -163,24 +165,42 @@ const MainContent = styled.div`
   }
 `;
 
+const PaperBanner = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px 10px;
+  margin: 4px 8px 0;
+  background: rgba(245,195,68,0.10);
+  border: 1px solid rgba(245,195,68,0.32);
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+`;
+
 const ChartSection = styled.div`
-  flex-shrink: 0; /* ✅ FIX: Don't shrink on mobile */
-  height: 450px;
+  flex-shrink: 0;
+  height: clamp(220px, 38vh, 360px);
   display: flex;
   flex-direction: column;
-  padding: 0.25rem;
-  margin-top: 0.5rem; /* ✅ FIX: Reduced margin to bring options section closer */
+  padding: 4px 8px 0;
+  margin-top: 0;
   position: relative;
 
   @media (min-width: 768px) {
-    flex: 1; /* Take available space on desktop */
+    flex: 1;
     height: auto;
-    min-height: 400px;
-    max-height: 500px; /* ✅ FIX: Prevent chart from expanding beyond this height */
-    max-width: calc(100vw - 450px); /* ✅ FIX: Account for sidebar width (400px + padding) */
-    padding: 0.5rem;
-    margin-top: 1rem; /* Reduced desktop margin too */
-    overflow: hidden; /* ✅ FIX: Prevent content overflow */
+    min-height: 360px;
+    max-height: 520px;
+    max-width: calc(100vw - 410px);
+    padding: 8px 10px 0;
+    margin-top: 4px;
+    overflow: hidden;
   }
 `;
 
@@ -334,12 +354,39 @@ interface TradeData {
   quotedPayoutMultiple?: number;
 }
 
+/**
+ * Auto-scroll the chart into view after a trade is placed.
+ *
+ * Triggers when the device is touch-primary OR the viewport is too short
+ * for the chart + active-ticket card to both fit above the fold (≈700px).
+ * On laptops with a tall window we leave the layout alone — the user
+ * already sees both surfaces.
+ *
+ * Uses requestAnimationFrame so the DOM has reflowed with the new
+ * ActiveTicketCard before we measure / scroll.
+ */
+const scrollChartIntoView = (): void => {
+  if (typeof window === 'undefined') return;
+  const isTouchPrimary = window.matchMedia?.('(pointer: coarse)').matches ?? false;
+  const isShortViewport = window.innerHeight < 700;
+  if (!isTouchPrimary && !isShortViewport) return;
+  requestAnimationFrame(() => {
+    const el = document.querySelector('[data-chart-section]');
+    if (el && 'scrollIntoView' in el) {
+      (el as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  });
+};
+
 export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode = false, onConnectWallet, shouldOpenHelp, onHelpOpened }) => {
   const { priceState, isConnected: priceConnected } = useSynchronizedPrice();
   const { isConnected: canisterConnected, atticusService } = useCanister();
   const { user } = useAuth();
   const { refreshBalance } = useBalance();
   const { showOnboarding, handleClose, handleDontShowAgain } = useOnboarding(isDemoMode);
+  const { dismiss: dismissFirstTradeHint } = useFirstTradeHint();
 
   const [activeTab, setActiveTab] = useState<'trade' | 'positions' | 'account'>('trade');
   const [optionType, setOptionType] = useState<'call' | 'put' | null>(null);
@@ -683,19 +730,8 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
       toastTradePlaced({ direction: finalOptionType, stake: contracts, tenor: finalExpiry });
       refreshBalance().catch(() => {});
       setActiveTab('trade');
-
-      // Auto-scroll to show chart on mobile
-      if (window.innerWidth <= 767) {
-        // ✅ FIX: Scroll to chart section to make it visible after trade
-        const chartSection = document.querySelector('[data-chart-section]');
-        if (chartSection) {
-          chartSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        } else {
-          // Fallback: scroll to show chart area (header height + some padding)
-          window.scrollTo({ top: 100, behavior: 'smooth' });
-        }
-      }
-
+      scrollChartIntoView();
+      dismissFirstTradeHint();
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -790,6 +826,7 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
       </Header>
 
       <MainContent>
+        {isDemoMode && <PaperBanner>Paper · No real money at stake</PaperBanner>}
         <ChartSection data-chart-section>
           <ErrorBoundary fallback={<div>Chart temporarily unavailable</div>}>
             <PriceChart {...chartProps} />
@@ -851,19 +888,22 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
                     );
                   })()
                 ) : (
-                  <TradeForm
-                    currentPrice={priceState.current}
-                    optionType={optionType}
-                    strikeOffset={strikeOffset}
-                    isTradeActive={tradeState.isActive}
-                    isTradeInProgress={tradeState.isInProgress}
-                    onOptionTypeSelect={handleOptionTypeSelect}
-                    onStrikeOffsetSelect={handleStrikeOffsetSelect}
-                    onExpirySelect={handleExpirySelect}
-                    onTradeStart={handleTradeStart}
-                    isConnected={isFullyConnected}
-                    isDemoMode={isDemoMode}
-                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '8px 0' }}>
+                    <FirstTradeHint />
+                    <TradeForm
+                      currentPrice={priceState.current}
+                      optionType={optionType}
+                      strikeOffset={strikeOffset}
+                      isTradeActive={tradeState.isActive}
+                      isTradeInProgress={tradeState.isInProgress}
+                      onOptionTypeSelect={handleOptionTypeSelect}
+                      onStrikeOffsetSelect={handleStrikeOffsetSelect}
+                      onExpirySelect={handleExpirySelect}
+                      onTradeStart={handleTradeStart}
+                      isConnected={isFullyConnected}
+                      isDemoMode={isDemoMode}
+                    />
+                  </div>
                 )}
               </ErrorBoundary>
             )}
