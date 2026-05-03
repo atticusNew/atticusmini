@@ -3,7 +3,7 @@ services:
     name: atticusmini
     runtime: static
     buildCommand: npm install && npm run build
-    staticPublishPath: ./AT_frontend/dist
+    staticPublishPath: ./dist
     pullRequestPreviewsEnabled: false
     routes:
       - type: rewrite
