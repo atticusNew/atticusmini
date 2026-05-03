@@ -1,20 +1,18 @@
 /**
- * ActiveTicketCard — hero surface for an open position.
+ * ActiveTicketCard — row format for the active position.
  *
- * v2: simplified for novices. Three things matter while a trade is live:
- * (1) am I winning right now, (2) how much time is left, (3) can I take
- * the money and run. Everything else (strike absolute, entry, stake →
- * win) is ambient context summed up in one thin line. The "Hold to
- * expiry" button is gone — that's what doing nothing means.
+ * v3: matches the form's label-left/value-right layout. Three rows
+ * (Worth now / PnL / countdown header), one full-width sell button,
+ * lockout hint when the sell-back window is closing.
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
-import { Card } from '../ui/primitives';
 import { earlyExitService } from '../services/sellback/EarlyExitService';
 import { getPartnerExchange, type PartnerTicket } from '../services/partner';
 import { tenorToSeconds } from '../services/pricing/tenor';
 import { toastSoldBack } from './tradeToasts';
+import { FormRow, FormRowLabel, FormRowControl } from '../ui/primitives';
 
 interface ActiveTicketCardProps {
   ticketId: number;
@@ -28,13 +26,10 @@ interface ActiveTicketCardProps {
   onSold: () => void;
 }
 
-const Wrap = styled(Card)`
-  padding: 16px;
+const Wrap = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px rgba(245, 195, 68, 0.18);
+  padding: 4px 14px 14px;
 `;
 
 const HeaderRow = styled.div`
@@ -42,21 +37,31 @@ const HeaderRow = styled.div`
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
 `;
 
-const DirectionTag = styled.div<{ tone: 'up' | 'down' }>`
+const DirectionTag = styled.span<{ tone: 'up' | 'down' }>`
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px;
+  padding: 3px 8px;
   border-radius: 999px;
   background: ${p => (p.tone === 'up' ? 'var(--up-dim)' : 'var(--down-dim)')};
   color: ${p => (p.tone === 'up' ? 'var(--up)' : 'var(--down)')};
   font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 800;
   letter-spacing: 0.06em;
-  text-transform: uppercase;
+`;
+
+const HeaderTarget = styled.span`
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-left: 8px;
+  .em { color: var(--text); font-weight: 600; }
 `;
 
 const Timer = styled.div<{ tone: 'normal' | 'warn' | 'critical' }>`
@@ -68,55 +73,13 @@ const Timer = styled.div<{ tone: 'normal' | 'warn' | 'critical' }>`
     p.tone === 'critical' ? 'var(--down)' : p.tone === 'warn' ? 'var(--accent)' : 'var(--text)'};
 `;
 
-const ContextLine = styled.div`
-  font-family: var(--font-sans);
-  font-size: 12px;
-  color: var(--text-dim);
-  text-align: center;
-  line-height: 1.4;
-  .em { color: var(--text); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-`;
-
-const Hero = styled.div<{ tone: 'pos' | 'neg' | 'flat' }>`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 14px;
-  border-radius: 12px;
-  background: ${p =>
-    p.tone === 'pos' ? 'var(--up-dim)' : p.tone === 'neg' ? 'var(--down-dim)' : 'var(--bg-elev-2)'};
-  border: 1px solid ${p =>
-    p.tone === 'pos'
-      ? 'rgba(27,196,125,0.32)'
-      : p.tone === 'neg'
-        ? 'rgba(255,93,108,0.32)'
-        : 'var(--border)'};
-
-  .label {
-    font-family: var(--font-sans);
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-dim);
-  }
-  .now {
-    font-family: var(--font-mono);
-    font-variant-numeric: tabular-nums;
-    font-weight: 700;
-    font-size: 28px;
-    color: ${p =>
-      p.tone === 'pos' ? 'var(--up)' : p.tone === 'neg' ? 'var(--down)' : 'var(--text)'};
-    line-height: 1;
-  }
-  .pnl {
-    font-family: var(--font-mono);
-    font-variant-numeric: tabular-nums;
-    font-size: 12px;
-    color: ${p =>
-      p.tone === 'pos' ? 'var(--up)' : p.tone === 'neg' ? 'var(--down)' : 'var(--text-dim)'};
-  }
+const RowValue = styled.span<{ tone?: 'pos' | 'neg' | 'flat' }>`
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 16px;
+  color: ${p =>
+    p.tone === 'pos' ? 'var(--up)' : p.tone === 'neg' ? 'var(--down)' : 'var(--text)'};
 `;
 
 const SellButton = styled.button`
@@ -127,6 +90,7 @@ const SellButton = styled.button`
   border: none;
   border-radius: 12px;
   padding: 16px;
+  margin-top: 14px;
   font-family: var(--font-sans);
   font-weight: 800;
   font-size: 16px;
@@ -143,8 +107,18 @@ const LockoutHint = styled.div<{ tone: 'normal' | 'warn' }>`
   font-size: 11px;
   font-weight: 600;
   text-align: center;
+  margin-top: 8px;
   color: ${p => (p.tone === 'warn' ? 'var(--accent)' : 'var(--text-dim)')};
   letter-spacing: 0.04em;
+`;
+
+const Reason = styled.div`
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text-dim);
+  text-align: center;
+  margin-top: 14px;
+  font-style: italic;
 `;
 
 const formatUSD = (n: number): string =>
@@ -195,10 +169,9 @@ export const ActiveTicketCard: React.FC<ActiveTicketCardProps> = props => {
 
   const refund = quote ? quote.refundUSD.toNumber() : 0;
   const pnl = quote ? quote.pnlUSD.toNumber() : 0;
-  const heroTone: 'pos' | 'neg' | 'flat' =
+  const pnlTone: 'pos' | 'neg' | 'flat' =
     pnl > 0.005 ? 'pos' : pnl < -0.005 ? 'neg' : 'flat';
 
-  const inTheMoney = optionType === 'call' ? spotUSD > strikePrice : spotUSD < strikePrice;
   const lockoutTone: 'normal' | 'warn' =
     quote && quote.secondsUntilLockout > 0 && quote.secondsUntilLockout <= 10 ? 'warn' : 'normal';
 
@@ -223,27 +196,32 @@ export const ActiveTicketCard: React.FC<ActiveTicketCardProps> = props => {
   return (
     <Wrap aria-live="polite">
       <HeaderRow>
-        <DirectionTag tone={optionType === 'call' ? 'up' : 'down'}>
-          {optionType === 'call' ? '↑ UP' : '↓ DOWN'} · target ${formatUSD(strikePrice)}
-        </DirectionTag>
+        <div>
+          <DirectionTag tone={optionType === 'call' ? 'up' : 'down'}>
+            {optionType === 'call' ? '▲ UP' : '▼ DOWN'}
+          </DirectionTag>
+          <HeaderTarget>
+            target <span className="em">${formatUSD(strikePrice)}</span>
+          </HeaderTarget>
+        </div>
         <Timer tone={timerTone}>{formatRemaining(remaining)}</Timer>
       </HeaderRow>
 
-      <Hero tone={heroTone}>
-        <span className="label">If you sell now</span>
-        <span className="now">${formatUSD(refund)}</span>
-        <span className="pnl">
-          {heroTone === 'flat'
-            ? '— flat —'
-            : `${pnl >= 0 ? '+' : '−'}$${formatUSD(Math.abs(pnl))}`}
-        </span>
-      </Hero>
+      <FormRow>
+        <FormRowLabel>Worth now</FormRowLabel>
+        <FormRowControl>
+          <RowValue>${formatUSD(refund)}</RowValue>
+        </FormRowControl>
+      </FormRow>
 
-      <ContextLine>
-        BTC <span className="em" style={{ color: inTheMoney ? 'var(--up)' : 'var(--down)' }}>
-          ${formatUSD(spotUSD)}
-        </span> · {inTheMoney ? 'winning' : 'needs to move'}
-      </ContextLine>
+      <FormRow>
+        <FormRowLabel>PnL</FormRowLabel>
+        <FormRowControl>
+          <RowValue tone={pnlTone}>
+            {pnlTone === 'flat' ? '$0.00' : `${pnl >= 0 ? '+' : '−'}$${formatUSD(Math.abs(pnl))}`}
+          </RowValue>
+        </FormRowControl>
+      </FormRow>
 
       {!quote || quote.available ? (
         <>
@@ -261,9 +239,9 @@ export const ActiveTicketCard: React.FC<ActiveTicketCardProps> = props => {
           )}
         </>
       ) : (
-        <ContextLine style={{ fontStyle: 'italic' }}>
+        <Reason>
           {quote.reason ?? 'Sell-back unavailable'} — letting it ride to expiry.
-        </ContextLine>
+        </Reason>
       )}
     </Wrap>
   );

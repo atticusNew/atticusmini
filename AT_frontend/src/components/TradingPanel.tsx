@@ -185,7 +185,7 @@ const PaperBanner = styled.div`
 
 const ChartSection = styled.div`
   flex-shrink: 0;
-  height: clamp(220px, 38vh, 360px);
+  height: clamp(200px, 32vh, 320px);
   display: flex;
   flex-direction: column;
   padding: 4px 8px 0;
@@ -195,9 +195,10 @@ const ChartSection = styled.div`
   @media (min-width: 768px) {
     flex: 1;
     height: auto;
-    min-height: 360px;
+    min-height: 320px;
     max-height: 520px;
-    max-width: calc(100vw - 410px);
+    /* Sidebar is 400px + 1px border. Don't reserve more than that. */
+    max-width: calc(100vw - 401px);
     padding: 8px 10px 0;
     margin-top: 4px;
     overflow: hidden;
@@ -391,7 +392,7 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
   const [activeTab, setActiveTab] = useState<'trade' | 'positions' | 'account'>('trade');
   const [optionType, setOptionType] = useState<'call' | 'put' | null>(null);
   const [strikeOffset, setStrikeOffset] = useState(0);
-  const [selectedExpiry, setSelectedExpiry] = useState('5s');
+  const [selectedExpiry, setSelectedExpiry] = useState('1m');
   
   // ✅ OPTIMIZED TRADE STATE: Single consolidated state object
   const [tradeState, setTradeState] = useState<{

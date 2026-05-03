@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import styled from 'styled-components';
-import { Button, Card, Chip, Label, Stack } from '../ui/primitives';
+import { Button, Chip, FormRow, FormRowLabel, FormRowControl, Stack } from '../ui/primitives';
 import { pricingService, Tenor } from '../services/pricing/PricingService';
 import { useBalance } from '../contexts/BalanceProvider';
 import { useAuth } from '../contexts/AuthProvider';
@@ -25,44 +25,35 @@ export interface TradeFormProps {
 }
 
 /**
- * v2: 4 strike offsets paired with novice-friendly distance tags.
- * Order is close → far, so payout multiple grows left → right and the
- * grid mirrors the close/near/reach/far mental model.
+ * v3: strike picker is the offset only — `+$5 / +$10 / +$25 / +$50`
+ * (signs flip to `−` when PUT is selected). Trade economics live in
+ * the Risk → Win line below, which updates as the trader taps.
  */
-const STRIKE_TIERS: ReadonlyArray<{ offset: number; tag: string }> = [
-  { offset: 5,   tag: 'close' },
-  { offset: 10,  tag: 'near' },
-  { offset: 25,  tag: 'reach' },
-  { offset: 50,  tag: 'far' },
-];
+const STRIKE_OFFSETS = [5, 10, 25, 50] as const;
 const TENORS: Tenor[] = ['30s', '1m', '5m', '15m'];
-const STAKE_PRESETS = [1, 5, 25, 100] as const;
 const STAKE_MIN = 1;
 const STAKE_MAX = 100;
 
-const Container = styled(Card)`
-  padding: 14px;
+/**
+ * v3 container: flat list, no card border. The trading sidebar's own
+ * background carries the surface; per-row hairline dividers handle
+ * grouping.
+ */
+const Container = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  padding: 4px 14px 14px;
 `;
 
-const Section = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-`;
-
-const ChipGrid4 = styled.div`
+/**
+ * 4-up button group used by both Direction (UP/DOWN) and the chip rows
+ * (Strike/Tenor). Equal-width grid keeps the form vertically tidy.
+ */
+const ButtonGroup = styled.div<{ cols: 2 | 4 }>`
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-`;
-
-const DirectionGroup = styled.div`
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  grid-template-columns: repeat(${p => p.cols}, 1fr);
+  gap: 6px;
+  width: 100%;
 `;
 
 const DirectionButton = styled.button<{ active?: boolean; tone: 'up' | 'down' }>`
@@ -70,108 +61,49 @@ const DirectionButton = styled.button<{ active?: boolean; tone: 'up' | 'down' }>
   border: 1.5px solid ${p =>
     p.active ? (p.tone === 'up' ? 'var(--up)' : 'var(--down)') : 'var(--border)'};
   background: ${p =>
-    p.active ? (p.tone === 'up' ? 'var(--up-dim)' : 'var(--down-dim)') : 'var(--bg-elev-2)'};
+    p.active ? (p.tone === 'up' ? 'var(--up-dim)' : 'var(--down-dim)') : 'transparent'};
   color: ${p => (p.active ? (p.tone === 'up' ? 'var(--up)' : 'var(--down)') : 'var(--text)')};
-  border-radius: 14px;
-  padding: 18px 16px;
+  border-radius: 10px;
+  padding: 8px 10px;
   font-family: var(--font-sans);
-  font-weight: 800;
-  font-size: 18px;
-  letter-spacing: 0.06em;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.04em;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   cursor: pointer;
   transition: 120ms ease-out;
+  min-height: 36px;
   &:disabled { opacity: 0.5; cursor: not-allowed; }
   &:hover:not(:disabled) {
     border-color: ${p => (p.tone === 'up' ? 'var(--up)' : 'var(--down)')};
   }
 `;
 
-const StrikeChipInner = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-`;
-
 /**
- * v2: chip headline is the absolute target price (the number the
- * trader sees on the chart's strike line) — not the offset jargon.
- * Direction tints the border so the picker visually inherits the
- * UP/DOWN choice the trader just made.
+ * v3 strike chip: signed offset only. Active state is an accent
+ * border. The chip's outer typography (mono, weight 700) renders the
+ * `+$5` / `−$10` text directly — no inner spans needed.
  */
-const StrikeChip = styled.button<{ active?: boolean; tone: 'up' | 'down' | 'neutral' }>`
+const StrikeChip = styled.button<{ active?: boolean }>`
   appearance: none;
-  border: 1px solid ${p => {
-    if (!p.active && p.tone === 'neutral') return 'var(--border)';
-    if (p.active) return p.tone === 'up' ? 'var(--up)' : p.tone === 'down' ? 'var(--down)' : 'var(--border-strong)';
-    return p.tone === 'up' ? 'rgba(27,196,125,0.4)' : p.tone === 'down' ? 'rgba(255,93,108,0.4)' : 'var(--border)';
-  }};
+  border: 1px solid ${p => (p.active ? 'var(--accent)' : 'var(--border)')};
   background: ${p => (p.active ? 'var(--bg-elev-2)' : 'transparent')};
-  border-radius: 10px;
-  padding: 10px 8px;
+  border-radius: 8px;
+  padding: 8px 6px;
   cursor: pointer;
   color: var(--text);
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 13px;
   text-align: center;
   transition: 120ms ease-out;
+  min-height: 36px;
   &:disabled { opacity: 0.45; cursor: not-allowed; }
-  &:hover:not(:disabled) {
-    border-color: ${p => (p.tone === 'up' ? 'var(--up)' : p.tone === 'down' ? 'var(--down)' : 'var(--border-strong)')};
-  }
-  .target {
-    font-weight: 700;
-    font-size: 13px;
-    font-family: var(--font-mono);
-    font-variant-numeric: tabular-nums;
-    color: var(--text);
-    line-height: 1.1;
-  }
-  .distance {
-    font-size: 10px;
-    color: var(--text-dim);
-    letter-spacing: 0.02em;
-    text-transform: lowercase;
-  }
-  .mult {
-    font-family: var(--font-mono);
-    font-variant-numeric: tabular-nums;
-    font-size: 11px;
-    font-weight: 700;
-    color: ${p => (p.tone === 'up' ? 'var(--up)' : p.tone === 'down' ? 'var(--down)' : 'var(--text-dim)')};
-  }
-`;
-
-const StrikeGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-`;
-
-const StrikeIntro = styled.div`
-  font-family: var(--font-sans);
-  font-size: 12px;
-  color: var(--text-dim);
-  margin-bottom: 6px;
-  line-height: 1.35;
-  .em { color: var(--text); font-weight: 600; }
-`;
-
-const StakeRow = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-`;
-
-const StakePresetGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-  margin-top: 8px;
+  &:hover:not(:disabled) { border-color: var(--border-strong); }
 `;
 
 const StakeStepper = styled.div`
@@ -207,46 +139,30 @@ const StakeValue = styled.div`
 `;
 
 /**
- * v2: Risk → Win panel.
- *
- * Hero is the Win number (green, mono, 24px). Risk sits underneath
- * as a small subtitle. We dropped the multiplier (still on the
- * strike chip) and the arrow glyph (visually noisy for a novice).
+ * v3: Risk → Win is a single centered sentence — no card, no border.
+ * Same data as the v2 panel, half the visual weight.
  */
-const RiskRewardPanel = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 14px 14px 12px;
-  background: var(--bg-elev-2);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+const RiskWinLine = styled.div`
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--text-dim);
+  padding: 4px 0;
+  line-height: 1.3;
 
+  .risk {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    font-weight: 700;
+  }
   .win {
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
     color: var(--up);
     font-weight: 800;
-    font-size: 28px;
-    line-height: 1;
-    letter-spacing: 0.01em;
-  }
-  .winLabel {
-    font-family: var(--font-sans);
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--up);
-    opacity: 0.8;
-  }
-  .risk {
-    font-family: var(--font-mono);
-    font-variant-numeric: tabular-nums;
-    color: var(--text-dim);
-    font-size: 12px;
-    margin-top: 4px;
+    font-size: 17px;
   }
 `;
 
@@ -294,7 +210,6 @@ export const TradeForm: React.FC<TradeFormProps> = ({
   // is gated by `directionPicked` below.
   const direction = optionType ?? 'call';
   const directionPicked = optionType != null;
-  const tone: 'up' | 'down' = direction === 'call' ? 'up' : 'down';
 
   const tenorReady = !!tenor;
   const ready =
@@ -364,123 +279,93 @@ export const TradeForm: React.FC<TradeFormProps> = ({
 
   return (
     <Container>
-      <Section>
-        <DirectionGroup>
-          <DirectionButton
-            type="button"
-            tone="up"
-            active={optionType === 'call'}
-            disabled={isTradeActive || isTradeInProgress}
-            onClick={() => handleDirection('call')}
-            aria-label="Bet that BTC will go up"
-          >
-            ▲ UP
-          </DirectionButton>
-          <DirectionButton
-            type="button"
-            tone="down"
-            active={optionType === 'put'}
-            disabled={isTradeActive || isTradeInProgress}
-            onClick={() => handleDirection('put')}
-            aria-label="Bet that BTC will go down"
-          >
-            ▼ DOWN
-          </DirectionButton>
-        </DirectionGroup>
-      </Section>
-
-      <Section>
-        <Label>Target price</Label>
-        <StrikeIntro>
-          {!optionType
-            ? <>Pick <span className="em">UP</span> or <span className="em">DOWN</span> first, then choose a target price.</>
-            : optionType === 'call'
-              ? <>BTC must close <span className="em">above</span> the price you pick in <span className="em">{tenor}</span>.</>
-              : <>BTC must close <span className="em">below</span> the price you pick in <span className="em">{tenor}</span>.</>}
-        </StrikeIntro>
-        <StrikeGrid>
-          {STRIKE_TIERS.map(({ offset, tag }) => {
-            const q = optionType && currentPrice
-              ? pricingService.quote({
-                  optionType,
-                  spotUSD: currentPrice,
-                  strikeOffsetUSD: offset,
-                  tenor,
-                  contracts: stake,
-                })
-              : null;
-            const target = q ? q.strikeUSD : null;
-            const mult = q ? q.payoutMultiple : null;
-            return (
-              <StrikeChip
-                type="button"
-                key={offset}
-                tone={optionType ? tone : 'neutral'}
-                active={strikeOffset === offset}
-                disabled={!optionType || isTradeActive || isTradeInProgress}
-                onClick={() => handleStrike(offset)}
-              >
-                <StrikeChipInner>
-                  <span className="target">
-                    {target != null ? `$${formatUSD(target)}` : `±$${offset}`}
-                  </span>
-                  <span className="distance">{tag}</span>
-                  <span className="mult">{mult != null ? `${mult.toFixed(1)}×` : '—'}</span>
-                </StrikeChipInner>
-              </StrikeChip>
-            );
-          })}
-        </StrikeGrid>
-      </Section>
-
-      <Section>
-        <ChipGrid4>
-          {TENORS.map(t => (
-            <Chip
+      <FormRow>
+        <FormRowLabel>Up or down?</FormRowLabel>
+        <FormRowControl>
+          <ButtonGroup cols={2}>
+            <DirectionButton
               type="button"
-              key={t}
-              active={tenor === t}
-              tone="accent"
-              onClick={() => handleTenor(t)}
+              tone="up"
+              active={optionType === 'call'}
               disabled={isTradeActive || isTradeInProgress}
+              onClick={() => handleDirection('call')}
+              aria-label="Bet that BTC will go up"
             >
-              {t}
-            </Chip>
-          ))}
-        </ChipGrid4>
-      </Section>
+              ▲ UP
+            </DirectionButton>
+            <DirectionButton
+              type="button"
+              tone="down"
+              active={optionType === 'put'}
+              disabled={isTradeActive || isTradeInProgress}
+              onClick={() => handleDirection('put')}
+              aria-label="Bet that BTC will go down"
+            >
+              ▼ DOWN
+            </DirectionButton>
+          </ButtonGroup>
+        </FormRowControl>
+      </FormRow>
 
-      <Section>
-        <Label>Stake</Label>
-        <StakeRow>
+      <FormRow>
+        <FormRowLabel>By how much?</FormRowLabel>
+        <FormRowControl>
+          <ButtonGroup cols={4}>
+            {STRIKE_OFFSETS.map(offset => {
+              const sign = optionType === 'put' ? '−' : '+';
+              return (
+                <StrikeChip
+                  type="button"
+                  key={offset}
+                  active={strikeOffset === offset}
+                  disabled={!optionType || isTradeActive || isTradeInProgress}
+                  onClick={() => handleStrike(offset)}
+                >
+                  {sign}${offset}
+                </StrikeChip>
+              );
+            })}
+          </ButtonGroup>
+        </FormRowControl>
+      </FormRow>
+
+      <FormRow>
+        <FormRowLabel>By when?</FormRowLabel>
+        <FormRowControl>
+          <ButtonGroup cols={4}>
+            {TENORS.map(t => (
+              <Chip
+                type="button"
+                key={t}
+                active={tenor === t}
+                tone="accent"
+                onClick={() => handleTenor(t)}
+                disabled={isTradeActive || isTradeInProgress}
+              >
+                {t}
+              </Chip>
+            ))}
+          </ButtonGroup>
+        </FormRowControl>
+      </FormRow>
+
+      <FormRow>
+        <FormRowLabel>How much?</FormRowLabel>
+        <FormRowControl>
           <StakeStepper>
             <StepperButton onClick={() => setStakeClamped(stake - 1)} disabled={stake <= STAKE_MIN}>−</StepperButton>
             <StakeValue>${stake}</StakeValue>
             <StepperButton onClick={() => setStakeClamped(stake + 1)} disabled={stake >= STAKE_MAX}>+</StepperButton>
           </StakeStepper>
-        </StakeRow>
-        <StakePresetGrid>
-          {STAKE_PRESETS.map(p => (
-            <Chip
-              type="button"
-              key={p}
-              active={stake === p}
-              onClick={() => setStakeClamped(p)}
-              disabled={isTradeActive || isTradeInProgress}
-            >
-              ${p}
-            </Chip>
-          ))}
-        </StakePresetGrid>
-      </Section>
+        </FormRowControl>
+      </FormRow>
 
       <Stack gap={10}>
         {live && optionType && (
-          <RiskRewardPanel>
-            <span className="winLabel">If you win</span>
-            <span className="win">${formatUSD(live.potentialPayoutUSD.toNumber())}</span>
-            <span className="risk">Risk ${formatUSD(live.premiumUSD.toNumber())}</span>
-          </RiskRewardPanel>
+          <RiskWinLine aria-live="polite">
+            Risk <span className="risk">${formatUSD(live.premiumUSD.toNumber())}</span>
+            {' '}to win <span className="win">${formatUSD(live.potentialPayoutUSD.toNumber())}</span>
+          </RiskWinLine>
         )}
 
         {errorMsg && <ErrorLine>{errorMsg}</ErrorLine>}
