@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import styled from 'styled-components';
 import { Button, Card, Chip, Label, Stack } from '../ui/primitives';
-import { pricingService, Tenor, TENOR_TO_SECONDS } from '../services/pricing/PricingService';
+import { pricingService, Tenor } from '../services/pricing/PricingService';
 import { useBalance } from '../contexts/BalanceProvider';
 import { useAuth } from '../contexts/AuthProvider';
 import { geoFenceService } from '../services/geofence/GeoFenceService';
@@ -25,7 +25,7 @@ export interface TradeFormProps {
 }
 
 const STRIKE_OFFSETS = [5, 10, 25, 50, 100] as const;
-const TENORS: Tenor[] = ['30s', '1m', '5m', '15m', '1h'];
+const TENORS: Tenor[] = ['30s', '1m', '5m', '15m'];
 const STAKE_PRESETS = [1, 5, 10, 25, 50] as const;
 const STAKE_MIN = 1;
 const STAKE_MAX = 100;
@@ -46,6 +46,12 @@ const Section = styled.div`
 const Row = styled.div`
   display: flex;
   flex-wrap: wrap;
+  gap: 8px;
+`;
+
+const ChipGrid4 = styled.div`
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 8px;
 `;
 
@@ -354,7 +360,7 @@ export const TradeForm: React.FC<TradeFormProps> = ({
 
       <Section>
         <Label>Tenor</Label>
-        <Row>
+        <ChipGrid4>
           {TENORS.map(t => (
             <Chip
               type="button"
@@ -367,12 +373,7 @@ export const TradeForm: React.FC<TradeFormProps> = ({
               {t}
             </Chip>
           ))}
-        </Row>
-        {tenor && (
-          <ContextLine>
-            window of <span className="strike">{TENOR_TO_SECONDS[tenor]}s</span> · sell-back available before lockout
-          </ContextLine>
-        )}
+        </ChipGrid4>
       </Section>
 
       <Section>
