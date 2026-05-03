@@ -4,7 +4,15 @@ import { getPartnerExchange, type PartnerTicket } from '../services/partner';
 import { earlyExitService } from '../services/sellback/EarlyExitService';
 import { useAuth } from '../contexts/AuthProvider';
 import { tenorToSeconds } from '../services/pricing/tenor';
-import { Card, Chip } from '../ui/primitives';
+import { Card } from '../ui/primitives';
+import {
+  partitionByStatus,
+  filterByRange,
+  summarize,
+  sortHistoryDesc,
+  sortActiveDesc,
+  type HistoryRange,
+} from './positionsHelpers';
 
 interface PositionsListProps {
   spotUSD: number;
@@ -132,6 +140,67 @@ const Empty = styled.div`
   font-size: 13px;
 `;
 
+const FilterRow = styled.div`
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 6px;
+  margin: 4px 0;
+`;
+
+const FilterChip = styled.button<{ active?: boolean }>`
+  appearance: none;
+  background: ${p => (p.active ? 'var(--bg-elev-2)' : 'transparent')};
+  color: ${p => (p.active ? 'var(--text)' : 'var(--text-dim)')};
+  border: 1px solid ${p => (p.active ? 'var(--border-strong)' : 'var(--border)')};
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: 120ms ease-out;
+  &:hover { color: var(--text); }
+`;
+
+const SummaryCard = styled(Card)`
+  padding: 12px 14px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+`;
+
+const SummaryStat = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  .label {
+    font-family: var(--font-sans);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .value {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--text);
+    white-space: nowrap;
+  }
+`;
+
+const NetValue = styled.span<{ tone: 'up' | 'down' | 'flat' }>`
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 15px;
+  color: ${p => (p.tone === 'up' ? 'var(--up)' : p.tone === 'down' ? 'var(--down)' : 'var(--text)')};
+`;
+
 const formatUSD = (n: number): string =>
   n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -217,6 +286,7 @@ const HistoryRow: React.FC<{ ticket: PartnerTicket }> = ({ ticket }) => {
 export const PositionsList: React.FC<PositionsListProps> = ({ spotUSD, onChanged }) => {
   const { user } = useAuth();
   const [tab, setTab] = useState<'active' | 'history'>('active');
+  const [range, setRange] = useState<HistoryRange>('all');
   const [tickets, setTickets] = useState<PartnerTicket[]>([]);
   const [now, setNow] = useState(Date.now());
   const [submittingId, setSubmittingId] = useState<number | null>(null);
@@ -239,8 +309,10 @@ export const PositionsList: React.FC<PositionsListProps> = ({ spotUSD, onChanged
     return () => clearInterval(id);
   }, [refresh]);
 
-  const active = tickets.filter(t => t.status === 'active');
-  const history = tickets.filter(t => t.status !== 'active');
+  const { active, history } = partitionByStatus(tickets);
+  const activeSorted = sortActiveDesc(active);
+  const historyFiltered = sortHistoryDesc(filterByRange(history, range, now));
+  const summary = summarize(historyFiltered);
 
   const onSell = async (ticketId: number) => {
     setSubmittingId(ticketId);
@@ -259,6 +331,9 @@ export const PositionsList: React.FC<PositionsListProps> = ({ spotUSD, onChanged
     }
   };
 
+  const netTone: 'up' | 'down' | 'flat' =
+    summary.netUSD > 0.005 ? 'up' : summary.netUSD < -0.005 ? 'down' : 'flat';
+
   return (
     <Container>
       <TabRow>
@@ -271,10 +346,10 @@ export const PositionsList: React.FC<PositionsListProps> = ({ spotUSD, onChanged
       </TabRow>
 
       {tab === 'active' &&
-        (active.length === 0 ? (
+        (activeSorted.length === 0 ? (
           <Empty>No active tickets. Open one from the Trade tab.</Empty>
         ) : (
-          active.map(t => (
+          activeSorted.map(t => (
             <ActiveRow
               key={t.id}
               ticket={t}
@@ -286,16 +361,42 @@ export const PositionsList: React.FC<PositionsListProps> = ({ spotUSD, onChanged
           ))
         ))}
 
-      {tab === 'history' &&
-        (history.length === 0 ? (
-          <Empty>No settled trades yet.</Empty>
-        ) : (
-          history.map(t => <HistoryRow key={t.id} ticket={t} />)
-        ))}
+      {tab === 'history' && (
+        <>
+          <FilterRow>
+            <FilterChip active={range === '24h'} onClick={() => setRange('24h')}>24h</FilterChip>
+            <FilterChip active={range === '7d'} onClick={() => setRange('7d')}>7d</FilterChip>
+            <FilterChip active={range === 'all'} onClick={() => setRange('all')}>All</FilterChip>
+          </FilterRow>
+          {historyFiltered.length > 0 && (
+            <SummaryCard>
+              <SummaryStat>
+                <span className="label">Net P&amp;L</span>
+                <NetValue tone={netTone}>
+                  {summary.netUSD >= 0 ? '+' : '−'}${formatUSD(Math.abs(summary.netUSD))}
+                </NetValue>
+              </SummaryStat>
+              <SummaryStat>
+                <span className="label">Win rate</span>
+                <span className="value">
+                  {summary.winRate === null ? '—' : `${Math.round(summary.winRate * 100)}%`}
+                </span>
+              </SummaryStat>
+              <SummaryStat>
+                <span className="label">W · L · T · Sold</span>
+                <span className="value">
+                  {summary.wins} · {summary.losses} · {summary.ties} · {summary.cancelled}
+                </span>
+              </SummaryStat>
+            </SummaryCard>
+          )}
+          {historyFiltered.length === 0 ? (
+            <Empty>{range === 'all' ? 'No settled trades yet.' : 'No trades in this window.'}</Empty>
+          ) : (
+            historyFiltered.map(t => <HistoryRow key={t.id} ticket={t} />)
+          )}
+        </>
+      )}
     </Container>
   );
 };
-
-// Suppress unused-import warning while transitioning legacy components.
-const _ensureChip: typeof Chip = Chip;
-void _ensureChip;
