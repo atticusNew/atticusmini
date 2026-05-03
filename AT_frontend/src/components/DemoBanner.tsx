@@ -2,26 +2,29 @@ import React from 'react';
 import styled from 'styled-components';
 
 const Banner = styled.div`
-  background: linear-gradient(90deg, #f4d03f, #ffb84d);
-  color: #1a1a1a;
-  font-family: 'Inter', sans-serif;
+  background: rgba(245, 195, 68, 0.08);
+  border-bottom: 1px solid rgba(245, 195, 68, 0.32);
+  color: var(--accent);
+  font-family: var(--font-sans);
   font-weight: 600;
-  font-size: 0.78rem;
-  letter-spacing: 0.02em;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   text-align: center;
-  padding: 0.45rem 0.75rem;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.15);
-  z-index: 1000;
+  padding: 6px 12px;
 
   span {
+    color: var(--text-dim);
     font-weight: 400;
-    margin-left: 0.4rem;
+    letter-spacing: 0.02em;
+    text-transform: none;
+    margin-left: 8px;
   }
 `;
 
 export const DemoBanner: React.FC = () => (
   <Banner>
-    DEMO MODE
-    <span>· paper book, no real trades, no real money</span>
+    Demo
+    <span>paper book · no real trades · no real money</span>
   </Banner>
 );
