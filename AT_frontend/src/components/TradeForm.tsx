@@ -36,7 +36,6 @@ const STRIKE_TIERS: ReadonlyArray<{ offset: number; tag: string }> = [
   { offset: 50,  tag: 'far' },
 ];
 const TENORS: Tenor[] = ['30s', '1m', '5m', '15m'];
-const STAKE_PRESETS = [1, 5, 25, 100] as const;
 const STAKE_MIN = 1;
 const STAKE_MAX = 100;
 
@@ -165,13 +164,6 @@ const StakeRow = styled.div`
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-`;
-
-const StakePresetGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-  margin-top: 8px;
 `;
 
 const StakeStepper = styled.div`
@@ -451,7 +443,7 @@ export const TradeForm: React.FC<TradeFormProps> = ({
       </Section>
 
       <Section>
-        <Label>Stake</Label>
+        <Label>How much</Label>
         <StakeRow>
           <StakeStepper>
             <StepperButton onClick={() => setStakeClamped(stake - 1)} disabled={stake <= STAKE_MIN}>−</StepperButton>
@@ -459,19 +451,6 @@ export const TradeForm: React.FC<TradeFormProps> = ({
             <StepperButton onClick={() => setStakeClamped(stake + 1)} disabled={stake >= STAKE_MAX}>+</StepperButton>
           </StakeStepper>
         </StakeRow>
-        <StakePresetGrid>
-          {STAKE_PRESETS.map(p => (
-            <Chip
-              type="button"
-              key={p}
-              active={stake === p}
-              onClick={() => setStakeClamped(p)}
-              disabled={isTradeActive || isTradeInProgress}
-            >
-              ${p}
-            </Chip>
-          ))}
-        </StakePresetGrid>
       </Section>
 
       <Stack gap={10}>
