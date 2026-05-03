@@ -1,0 +1,191 @@
+type WithdrawalRequest = 
+ record {
+   amount: float64;
+   created_at: int;
+   id: nat;
+   processed_at: opt int;
+   rejection_reason: opt text;
+   status: variant {
+             Approved;
+             Pending;
+             Processed;
+             Rejected;
+           };
+   to_address: text;
+   tx_hash: opt text;
+   user: principal;
+ };
+type UserTransaction = 
+ record {
+   amount: float64;
+   deposit_id: opt text;
+   id: text;
+   status: variant {
+             Confirmed;
+             Failed;
+             Pending;
+           };
+   timestamp: int;
+   transaction_type: variant {
+                       Deposit;
+                       Withdrawal;
+                     };
+   tx_hash: opt text;
+   user: principal;
+ };
+type UserTradeSummary = 
+ record {
+   loss_count: nat;
+   total_pnl: float64;
+   total_trades: nat;
+   trades: vec Position;
+   win_count: nat;
+ };
+type UserData = 
+ record {
+   balance: float64;
+   bitcoin_address: text;
+   created_at: int;
+   "principal": principal;
+   total_deposits: float64;
+   total_withdrawals: float64;
+   unique_deposit_address: opt text;
+ };
+type TradeStatus = 
+ variant {
+   Active;
+   Expired;
+   Settled;
+ };
+type SettlementResult = 
+ record {
+   outcome: text;
+   payout: float64;
+   profit: float64;
+ };
+type Result_5 = 
+ variant {
+   err: text;
+   ok: UserData;
+ };
+type Result_4 = 
+ variant {
+   err: text;
+   ok: principal;
+ };
+type Result_3 = 
+ variant {
+   err: text;
+   ok: nat;
+ };
+type Result_2 = 
+ variant {
+   err: text;
+   ok: SettlementResult;
+ };
+type Result_1 = 
+ variant {
+   err: text;
+   ok;
+ };
+type Result = 
+ variant {
+   err: text;
+   ok: text;
+ };
+type Position = 
+ record {
+   current_value: float64;
+   entry_premium: float64;
+   entry_price: float64;
+   expiry: text;
+   expiry_timestamp: int;
+   id: nat;
+   opened_at: int;
+   option_type: OptionType;
+   pnl: float64;
+   settled_at: opt int;
+   settlement_price: opt float64;
+   size: float64;
+   status: TradeStatus;
+   strike_price: float64;
+   user: principal;
+ };
+type PlatformWallet = 
+ record {
+   address: text;
+   balance: float64;
+   total_deposits: float64;
+   total_withdrawals: float64;
+ };
+type PlatformTradingSummary = 
+ record {
+   total_pnl: float64;
+   total_trades: nat;
+   total_volume: float64;
+   win_rate: float64;
+ };
+type OptionType = 
+ variant {
+   Call;
+   Put;
+ };
+type AdminLog = 
+ record {
+   action: text;
+   details: text;
+   timestamp: int;
+ };
+service : {
+  admin_add_liquidity: (amount: float64) -> (Result);
+  admin_approve_withdrawal: (request_id: nat) -> (Result);
+  admin_clean_test_accounts: () -> (text);
+  admin_credit_user_balance: (user: principal, amount_btc: float64) ->
+   (Result);
+  admin_mark_withdrawal_processed: (request_id: nat, tx_hash: text) ->
+   (Result);
+  admin_reconcile_balances: () -> (text);
+  admin_reject_withdrawal: (request_id: nat, reason: text) -> (Result);
+  admin_reset_platform_data: () -> (text);
+  admin_withdraw_liquidity: (amount: float64, _to_address: text) -> (Result);
+  create_user: (user: principal) -> (Result_5);
+  deposit_bitcoin: (user: principal, amount_satoshis: nat) -> (Result);
+  find_user_by_deposit_address: (address: text) -> (Result_4) query;
+  generate_unique_deposit_address: (user: principal) -> (Result);
+  generate_user_wallet: (user: principal) -> (Result);
+  get_active_positions: (user: principal) -> (vec Position) query;
+  get_admin_logs: () -> (vec AdminLog) query;
+  get_all_positions: () -> (vec Position) query;
+  get_all_transactions: () -> (vec UserTransaction) query;
+  get_all_user_addresses: () -> (vec record {
+                                       principal;
+                                       text;
+                                     }) query;
+  get_all_users: () -> (vec record {
+                              principal;
+                              UserData;
+                            }) query;
+  get_all_withdrawals: () -> (vec WithdrawalRequest) query;
+  get_btc_price: () -> (float64) query;
+  get_pending_withdrawals: () -> (vec WithdrawalRequest) query;
+  get_platform_trading_summary: () -> (PlatformTradingSummary) query;
+  get_platform_wallet: () -> (PlatformWallet) query;
+  get_user: (user: principal) -> (opt UserData) query;
+  get_user_deposit_address: (user: principal) -> (Result) query;
+  get_user_trade_summary: (user: principal) -> (UserTradeSummary) query;
+  get_user_transactions: (user: principal) -> (vec UserTransaction) query;
+  get_user_wallet: (user: principal) -> (opt text) query;
+  initialize_platform_wallet: () -> (Result);
+  log_admin_action: (action: text, details: text) -> ();
+  place_option_order: (user: principal, option_type: OptionType,
+   strike_offset: nat, expiry: text, contract_count: nat, current_btc_price:
+   opt float64) -> (Result_3);
+  request_withdrawal: (user: principal, amount_satoshis: nat, to_address:
+   text) -> (Result_3);
+  set_platform_bitcoin_address: (address: text) -> (Result);
+  settleTrade: (positionId: nat, finalPrice: nat64, user: principal) ->
+   (Result_2);
+  update_btc_price: (price: float64) -> (Result_1);
+  withdraw_bitcoin: (user: principal, amount_satoshis: nat, to_address:
+   text) -> (Result);
+}

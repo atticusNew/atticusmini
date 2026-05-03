@@ -1,0 +1,28 @@
+# Reference clones used by Cursor agents during exploration only
+AT_frontend_clone/
+
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build output
+AT_frontend/dist/
+AT_frontend/build/
+
+# Env
+**/.env
+**/.env.local
+**/.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
