@@ -4,6 +4,7 @@ import { useSynchronizedPrice } from '../hooks/useGlobalPriceFeed';
 import { OptionsTradeForm } from './OptionsTradeForm';
 import { PriceChart } from './PriceChart';
 import { TimerDisplay } from './TimerDisplay';
+import { SellbackCard } from './SellbackCard';
 import { SimpleTradeHistory } from './SimpleTradeHistory';
 import { OnboardingModal } from './OnboardingModal';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -1010,11 +1011,27 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
             <PriceChart {...chartProps} />
           </ErrorBoundary>
           
-          {/* ✅ FIXED: Timer moved outside chart to prevent re-renders */}
-          <TimerDisplay 
-            isActive={tradeState.isActive} 
-            expiry={selectedExpiry} 
-            onExpiry={handleAutoSettlement} 
+          {tradeState.isActive && tradeState.data?.positionId !== undefined && (
+            <SellbackCard
+              ticketId={tradeState.data.positionId}
+              spotUSD={priceState.current}
+              onSold={() => {
+                setTradeState(prev => ({
+                  ...prev,
+                  isActive: false,
+                  isInProgress: false,
+                  data: null,
+                  result: { message: 'Sold back early', type: 'success' },
+                }));
+                refreshBalance().catch(() => {});
+              }}
+            />
+          )}
+
+          <TimerDisplay
+            isActive={tradeState.isActive}
+            expiry={selectedExpiry}
+            onExpiry={handleAutoSettlement}
           />
         </ChartSection>
 
