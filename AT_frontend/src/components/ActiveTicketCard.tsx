@@ -97,7 +97,9 @@ const SellButton = styled.button`
   letter-spacing: 0.04em;
   cursor: pointer;
   transition: 120ms ease-out;
-  &:hover:not(:disabled) { background: var(--accent-hover); }
+  @media (hover: hover) {
+    &:hover:not(:disabled) { background: var(--accent-hover); }
+  }
   &:disabled { opacity: 0.45; cursor: not-allowed; }
 `;
 
