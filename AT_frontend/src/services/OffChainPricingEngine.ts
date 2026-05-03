@@ -4,7 +4,8 @@
  * This eliminates the need for a price oracle canister and provides instant calculations
  */
 
-import { mockPartnerExchange } from './MockPartnerExchange';
+import { Decimal } from 'decimal.js';
+import { getPartnerExchange } from './partner';
 
 export interface PriceData {
   current: number;
@@ -46,6 +47,8 @@ export class OffChainPricingEngine {
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 5;
   private reconnectDelay: number = 1000;
+  private placeSequence = 0;
+  private settleSequence = 0;
 
   constructor() {
     this.connectToPriceFeed();
@@ -327,19 +330,22 @@ export class OffChainPricingEngine {
       }
 
       const strikePrice = this.calculateStrikePrice(currentPrice, strikeOffset, optionType);
-
-      const result = await mockPartnerExchange.placeTrade({
+      const partner = getPartnerExchange();
+      this.placeSequence += 1;
+      const result = await partner.placeTicket({
         userId: userPrincipal,
         optionType,
-        strikeOffset,
-        expiry,
+        strikeOffsetUSD: strikeOffset,
+        tenor: expiry,
         contracts: contractCount,
-        entryPriceCents: Math.round(currentPrice * 100),
-        strikePriceCents: Math.round(strikePrice * 100),
+        entryPriceUSD: new Decimal(currentPrice),
+        strikePriceUSD: new Decimal(strikePrice),
+        premiumUSD: new Decimal(this.calculatePremium(contractCount)),
+        idempotencyKey: `place:${userPrincipal}:${Date.now()}:${this.placeSequence}`,
       });
 
       if ('ok' in result) {
-        return { success: true, positionId: result.ok };
+        return { success: true, positionId: result.ok.id };
       }
       return { success: false, error: result.err };
     } catch (error) {
@@ -421,15 +427,15 @@ export class OffChainPricingEngine {
     _userPrincipal?: string,
   ): Promise<void> {
     const outcome = settlementResult.outcome || 'loss';
-    const payoutCents = Math.round(settlementResult.payout * 100);
-    const profitCents = Math.max(0, Math.round(settlementResult.profit * 100));
-    const finalPriceCents = Math.round(settlementResult.finalPrice * 100);
-    const result = await mockPartnerExchange.recordSettlement({
-      positionId,
+    const partner = getPartnerExchange();
+    this.settleSequence += 1;
+    const result = await partner.settleTicket({
+      ticketId: positionId,
       outcome,
-      payoutCents,
-      profitCents,
-      finalPriceCents,
+      payoutUSD: new Decimal(settlementResult.payout),
+      profitUSD: new Decimal(Math.max(0, settlementResult.profit)),
+      finalPriceUSD: new Decimal(settlementResult.finalPrice),
+      idempotencyKey: `settle:${positionId}:${this.settleSequence}`,
     });
     if ('err' in result) throw new Error(result.err);
   }
