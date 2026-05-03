@@ -38,6 +38,14 @@ const buttonReset = css`
   }
 `;
 
+/**
+ * Hover styles only apply on devices with a real hover pointer.
+ * Touch devices keep the `:hover` state stuck after a tap until the
+ * next tap, which made the v3 chips look like they had two competing
+ * highlights (the actual selection in accent vs the stuck hover in
+ * border-strong). Wrapping the hover rule in `@media (hover: hover)`
+ * eliminates the bug on touch.
+ */
 export const Button = styled.button<{ variant?: 'primary' | 'ghost' | 'subtle'; size?: 'sm' | 'md' | 'lg' }>`
   ${buttonReset};
   border-radius: 12px;
@@ -50,7 +58,9 @@ export const Button = styled.button<{ variant?: 'primary' | 'ghost' | 'subtle'; 
       background: var(--accent);
       color: #1a1410;
       box-shadow: 0 6px 18px rgba(245, 195, 68, 0.28);
-      &:hover:not(:disabled) { background: var(--accent-hover); }
+      @media (hover: hover) {
+        &:hover:not(:disabled) { background: var(--accent-hover); }
+      }
       &:active:not(:disabled) { transform: translateY(1px); }
     `}
 
@@ -60,7 +70,9 @@ export const Button = styled.button<{ variant?: 'primary' | 'ghost' | 'subtle'; 
       background: var(--bg-elev-2);
       color: var(--text);
       border: 1px solid var(--border);
-      &:hover:not(:disabled) { border-color: var(--border-strong); }
+      @media (hover: hover) {
+        &:hover:not(:disabled) { border-color: var(--border-strong); }
+      }
     `}
 
   ${p =>
@@ -68,7 +80,9 @@ export const Button = styled.button<{ variant?: 'primary' | 'ghost' | 'subtle'; 
     css`
       background: transparent;
       color: var(--text-dim);
-      &:hover:not(:disabled) { color: var(--text); }
+      @media (hover: hover) {
+        &:hover:not(:disabled) { color: var(--text); }
+      }
     `}
 `;
 
@@ -78,7 +92,7 @@ export const Chip = styled.button<{ active?: boolean; tone?: 'up' | 'down' | 'ac
   padding: 8px 14px;
   font-size: 13px;
   background: ${p => (p.active ? 'var(--bg-elev-2)' : 'transparent')};
-  border: 1px solid ${p => {
+  border: 1.5px solid ${p => {
     if (!p.active) return 'var(--border)';
     if (p.tone === 'up') return 'var(--up)';
     if (p.tone === 'down') return 'var(--down)';
@@ -90,7 +104,10 @@ export const Chip = styled.button<{ active?: boolean; tone?: 'up' | 'down' | 'ac
     if (p.tone === 'down') return 'var(--down)';
     return 'var(--text)';
   }};
-  &:hover:not(:disabled) { color: var(--text); }
+  font-weight: ${p => (p.active ? 700 : 600)};
+  @media (hover: hover) {
+    &:hover:not(:disabled) { color: var(--text); }
+  }
 `;
 
 export const Pill = styled.span<{ tone?: 'neutral' | 'up' | 'down' | 'accent' | 'demo' }>`

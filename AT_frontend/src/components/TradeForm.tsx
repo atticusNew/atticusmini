@@ -77,19 +77,24 @@ const DirectionButton = styled.button<{ active?: boolean; tone: 'up' | 'down' }>
   transition: 120ms ease-out;
   min-height: 36px;
   &:disabled { opacity: 0.5; cursor: not-allowed; }
-  &:hover:not(:disabled) {
-    border-color: ${p => (p.tone === 'up' ? 'var(--up)' : 'var(--down)')};
+  /* Hover state only on real-pointer devices — touch leaves :hover
+     stuck after a tap, which competed with the active state. */
+  @media (hover: hover) {
+    &:hover:not(:disabled) {
+      border-color: ${p => (p.tone === 'up' ? 'var(--up)' : 'var(--down)')};
+    }
   }
 `;
 
 /**
- * v3 strike chip: signed offset only. Active state is an accent
- * border. The chip's outer typography (mono, weight 700) renders the
- * `+$5` / `−$10` text directly — no inner spans needed.
+ * v3 strike chip: signed offset only. v4 strengthens the active
+ * state (1.5px accent border + filled bg + bold) so it dominates any
+ * residual hover styling on hybrid devices, and gates :hover behind
+ * @media (hover: hover) so touch never gets a stuck-hover ghost.
  */
 const StrikeChip = styled.button<{ active?: boolean }>`
   appearance: none;
-  border: 1px solid ${p => (p.active ? 'var(--accent)' : 'var(--border)')};
+  border: ${p => (p.active ? '1.5px solid var(--accent)' : '1px solid var(--border)')};
   background: ${p => (p.active ? 'var(--bg-elev-2)' : 'transparent')};
   border-radius: 8px;
   padding: 8px 6px;
@@ -97,13 +102,17 @@ const StrikeChip = styled.button<{ active?: boolean }>`
   color: var(--text);
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
+  font-weight: ${p => (p.active ? 800 : 700)};
   font-size: 13px;
   text-align: center;
-  transition: 120ms ease-out;
+  transition: border-color 120ms ease-out, background 120ms ease-out;
   min-height: 36px;
   &:disabled { opacity: 0.45; cursor: not-allowed; }
-  &:hover:not(:disabled) { border-color: var(--border-strong); }
+  @media (hover: hover) {
+    &:hover:not(:disabled) {
+      border-color: ${p => (p.active ? 'var(--accent)' : 'var(--border-strong)')};
+    }
+  }
 `;
 
 const StakeStepper = styled.div`
@@ -124,7 +133,9 @@ const StepperButton = styled.button`
   height: 40px;
   font-size: 18px;
   cursor: pointer;
-  &:hover:not(:disabled) { background: var(--border); }
+  @media (hover: hover) {
+    &:hover:not(:disabled) { background: var(--border); }
+  }
   &:disabled { opacity: 0.4; cursor: not-allowed; }
 `;
 
