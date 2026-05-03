@@ -98,9 +98,13 @@ export const BalancePill: React.FC<{ label?: string }> = ({ label = 'Paper' }) =
     return () => clearTimeout(id);
   }, [lastDelta]);
 
+  // v4: a single ±$0.005 deadband drives both tone AND prefix so a
+  // sub-cent rounding swing can't flicker between green-with-+ and
+  // dim-with-no-prefix between updates.
+  const PNL_EPS = 0.005;
   const pnlTone: 'pos' | 'neg' | 'flat' =
-    dayPnl > 0.005 ? 'pos' : dayPnl < -0.005 ? 'neg' : 'flat';
-  const pnlPrefix = dayPnl > 0 ? '+' : dayPnl < 0 ? '−' : '';
+    dayPnl > PNL_EPS ? 'pos' : dayPnl < -PNL_EPS ? 'neg' : 'flat';
+  const pnlPrefix = pnlTone === 'pos' ? '+' : pnlTone === 'neg' ? '−' : '';
   const pnlAbs = Math.abs(dayPnl);
 
   const deltaTone: 'pos' | 'neg' | null = activeDelta
