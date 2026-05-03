@@ -6,6 +6,8 @@ import { ledgerService } from '../services/ledger/LedgerService';
 import type { TraderLedgerEntry } from '../services/ledger/LedgerService';
 import { mockPartnerExchangeAdapter } from '../services/partner';
 import { Card } from '../ui/primitives';
+// `mockPartnerExchangeAdapter` retained for the partner-name display; reset is
+// handled by `resetPaperBalance` so session P&L resets too.
 
 interface AccountScreenProps {
   onLogout: () => void | Promise<void>;
@@ -159,7 +161,7 @@ const formatRelative = (ts: number): string => {
 
 export const AccountScreen: React.FC<AccountScreenProps> = ({ onLogout, onReset }) => {
   const { user } = useAuth();
-  const { userBalance } = useBalance();
+  const { userBalance, resetPaperBalance } = useBalance();
   const [entries, setEntries] = useState<TraderLedgerEntry[]>([]);
 
   useEffect(() => {
@@ -176,8 +178,8 @@ export const AccountScreen: React.FC<AccountScreenProps> = ({ onLogout, onReset 
 
   const partner = useMemo(() => mockPartnerExchangeAdapter.name, []);
 
-  const handleReset = () => {
-    mockPartnerExchangeAdapter.reset();
+  const handleReset = async () => {
+    await resetPaperBalance();
     onReset();
   };
 
