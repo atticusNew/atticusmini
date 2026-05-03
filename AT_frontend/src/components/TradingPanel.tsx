@@ -6,7 +6,6 @@ import { FirstTradeHint } from './FirstTradeHint';
 import { useFirstTradeHint } from '../hooks/useFirstTradeHint';
 import { PriceChart } from './PriceChart';
 import { CountdownPill } from './CountdownPill';
-import { DemoPill } from './DemoPill';
 import { BalancePill } from './BalancePill';
 import { ActiveTicketCard } from './ActiveTicketCard';
 import {
@@ -57,98 +56,36 @@ const Header = styled.header`
   }
 `;
 
-const LogoContainer = styled.div`
+/**
+ * Brand lockup: square Foxify logo + 'Micro Options' wordmark.
+ * Logo runs at 28px on phones / 32px on desktop with a fixed aspect
+ * ratio (the source asset is 180x180 RGBA).
+ */
+const BrandLockup = styled.div`
   display: flex;
   align-items: center;
-  height: 40px;
+  gap: 8px;
 
   img {
-    height: 32px;
-    width: auto;
+    height: 28px;
+    width: 28px;
     object-fit: contain;
-    max-width: 150px;
-    opacity: 1; /* ✅ FIX: Remove opacity for full visibility */
+    border-radius: 6px;
+  }
+
+  .wordmark {
+    font-family: var(--font-sans);
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 0.01em;
+    color: var(--text);
+    white-space: nowrap;
   }
 
   @media (min-width: 768px) {
-    height: 45px;
-    
-    img {
-      height: 36px;
-      max-width: 180px;
-    }
-  }
-`;
-
-const Logo = styled.img`
-  height: 2rem;
-  width: auto;
-  margin: 0;
-
-  @media (max-width: 768px) {
-    height: 1.75rem;
-  }
-`;
-
-const DisconnectButton = styled.button<{ connected: boolean; isDemoMode?: boolean }>`
-  display: flex;
-  align-items: center;
-  gap: 0.25rem; /* ✅ FIXED: Reduced gap */
-  padding: 0.25rem 0.5rem; /* ✅ FIXED: Much smaller padding for mobile */
-  background: ${props => {
-    if (props.isDemoMode) return 'rgba(0, 212, 170, 0.1)'; // Green for demo
-    return props.connected ? 'rgba(255, 68, 68, 0.1)' : 'rgba(128, 128, 128, 0.1)';
-  }};
-  border: 1px solid ${props => {
-    if (props.isDemoMode) return '#00d4aa'; // Green border for demo
-    return props.connected ? '#ff4444' : 'var(--border)';
-  }};
-  color: ${props => {
-    if (props.isDemoMode) return '#00d4aa'; // Green text for demo
-    return props.connected ? '#ff4444' : 'var(--text-dim)';
-  }};
-  border-radius: 12px; /* ✅ FIXED: Smaller border radius */
-  font-size: 0.65rem; /* ✅ FIXED: Smaller font size */
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  
-  /* ✅ FIXED: Mobile-specific sizing */
-  @media (max-width: 480px) {
-    padding: 0.2rem 0.4rem;
-    font-size: 0.6rem;
-    gap: 0.2rem;
-  }
-
-  &:before {
-    content: '';
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: ${props => {
-      if (props.isDemoMode) return '#00d4aa'; // Green dot for demo
-      return props.connected ? '#ff4444' : '#666';
-    }};
-    animation: ${props => (props.connected || props.isDemoMode) ? 'pulse 2s infinite' : 'none'};
-  }
-
-  &:hover {
-    background: ${props => {
-      if (props.isDemoMode) return 'rgba(0, 212, 170, 0.2)'; // Green hover for demo
-      return props.connected ? 'rgba(255, 68, 68, 0.2)' : 'rgba(128, 128, 128, 0.2)';
-    }};
-    transform: translateY(-1px);
-  }
-
-  @keyframes pulse {
-    0%, 100% {
-      opacity: 1;
-      transform: scale(1);
-    }
-    50% {
-      opacity: 0.7;
-      transform: scale(1.1);
-    }
+    gap: 10px;
+    img { height: 32px; width: 32px; }
+    .wordmark { font-size: 17px; }
   }
 `;
 
@@ -751,43 +688,6 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
     }
   };
 
-  const handleTradeClose = async () => {
-    try {
-      
-      // ✅ COMPLETE: Reset all trade-related state
-      setTradeState({
-        isActive: false,
-        isInProgress: false,
-        data: null,
-        entryPrice: undefined,
-        countdown: 0,
-        statusMessage: null,
-        result: null,
-        settlementResult: null
-      });
-      setOptionType(null);
-      setStrikeOffset(0);
-      
-    } catch (error) {
-      console.error('❌ Failed to close trade:', error);
-    }
-  };
-
-  const handleDisconnectClick = () => {
-    if (isDemoMode) {
-      // ✅ FIX: In demo mode, go back to landing page by logging out
-      onLogout?.();
-    } else if (isFullyConnected) {
-      if (tradeState.isActive) {
-        handleTradeClose();
-      }
-      onLogout?.();
-    } else if (onConnectWallet) {
-      // If not connected, try to connect
-      onConnectWallet();
-    }
-  };
-
   const isFullyConnected = isDemoMode ? true : (priceConnected && canisterConnected);
 
   // ✅ FIXED: Use active trade params when trade is running, otherwise use form state
@@ -803,27 +703,28 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
   return (
     <TradingContainer>
       <Header>
-        <LogoContainer>
-          <Logo src="/images/attiminlogo.png" alt="Atticus" />
-        </LogoContainer>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <CountdownPill
-            isActive={tradeState.isActive}
-            expiry={selectedExpiry}
-            onExpiry={handleAutoSettlement}
-          />
-          {isDemoMode && <DemoPill />}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <BalancePill label={isDemoMode ? 'Paper' : 'Balance'} />
-          <DisconnectButton
-            connected={isFullyConnected}
-            isDemoMode={isDemoMode}
-            onClick={handleDisconnectClick}
-          >
-            {isDemoMode ? 'Exit demo' : (isFullyConnected ? 'Disconnect' : 'Reconnect')}
-          </DisconnectButton>
-        </div>
+        <BrandLockup aria-label="Foxify Micro Options">
+          <img src="/images/foxify-logo.png" alt="Foxify" />
+          <span className="wordmark">Micro Options</span>
+        </BrandLockup>
+        <BalancePill />
+        {/*
+          v4 header cleanup: dropped DemoPill, the 'Paper' label on
+          BalancePill, the Exit-demo button, and the global
+          CountdownPill (the active-ticket card has its own timer
+          right next to the trade). The PAPER banner under the chart
+          is the single demo-mode reminder.
+
+          The countdown timer is still wired up on TradingPanel
+          (handleAutoSettlement fires when it expires) — it just
+          no longer renders in the header.
+        */}
+        <CountdownPill
+          isActive={tradeState.isActive}
+          expiry={selectedExpiry}
+          onExpiry={handleAutoSettlement}
+          headless
+        />
       </Header>
 
       <MainContent>

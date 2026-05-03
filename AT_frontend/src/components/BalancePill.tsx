@@ -87,7 +87,13 @@ const DeltaChip = styled.span<{ tone: 'pos' | 'neg' }>`
 const formatUSD = (n: number): string =>
   n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export const BalancePill: React.FC<{ label?: string }> = ({ label = 'Paper' }) => {
+/**
+ * v4: `label` is optional and unset by default. When omitted, the
+ * pill renders just the balance + day P&L delta — the demo banner
+ * under the chart is the single 'paper money' reminder, and the
+ * uncluttered pill makes the dollar number the headline.
+ */
+export const BalancePill: React.FC<{ label?: string }> = ({ label }) => {
   const { userBalance, dayPnl, lastDelta } = useBalance();
   const [activeDelta, setActiveDelta] = useState<{ amount: number; key: number } | null>(null);
 
@@ -98,9 +104,13 @@ export const BalancePill: React.FC<{ label?: string }> = ({ label = 'Paper' }) =
     return () => clearTimeout(id);
   }, [lastDelta]);
 
+  // v4: a single ±$0.005 deadband drives both tone AND prefix so a
+  // sub-cent rounding swing can't flicker between green-with-+ and
+  // dim-with-no-prefix between updates.
+  const PNL_EPS = 0.005;
   const pnlTone: 'pos' | 'neg' | 'flat' =
-    dayPnl > 0.005 ? 'pos' : dayPnl < -0.005 ? 'neg' : 'flat';
-  const pnlPrefix = dayPnl > 0 ? '+' : dayPnl < 0 ? '−' : '';
+    dayPnl > PNL_EPS ? 'pos' : dayPnl < -PNL_EPS ? 'neg' : 'flat';
+  const pnlPrefix = pnlTone === 'pos' ? '+' : pnlTone === 'neg' ? '−' : '';
   const pnlAbs = Math.abs(dayPnl);
 
   const deltaTone: 'pos' | 'neg' | null = activeDelta
@@ -109,8 +119,8 @@ export const BalancePill: React.FC<{ label?: string }> = ({ label = 'Paper' }) =
   const deltaPrefix = activeDelta && activeDelta.amount > 0 ? '+' : '−';
 
   return (
-    <Wrap aria-live="polite" aria-label={`Paper balance ${formatUSD(userBalance)} dollars`}>
-      <Label>{label}</Label>
+    <Wrap aria-live="polite" aria-label={`Balance ${formatUSD(userBalance)} dollars`}>
+      {label && <Label>{label}</Label>}
       <Stack>
         <BalanceText>${formatUSD(userBalance)}</BalanceText>
         <PnlText tone={pnlTone}>
