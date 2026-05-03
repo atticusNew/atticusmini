@@ -6,6 +6,13 @@ interface CountdownPillProps {
   isActive: boolean;
   expiry: string;
   onExpiry: () => void;
+  /**
+   * v4: when true the component still owns the expiry timer (so the
+   * trade settles at the right moment) but renders nothing. Lets the
+   * header drop the visible pill while the active-ticket card carries
+   * the user-facing countdown.
+   */
+  headless?: boolean;
 }
 
 const Pill = styled.span<{ tone: 'normal' | 'warn' | 'critical' }>`
@@ -60,7 +67,7 @@ const formatRemaining = (s: number): string => {
   return `${h}:${m.toString().padStart(2, '0')}`;
 };
 
-export const CountdownPill: React.FC<CountdownPillProps> = ({ isActive, expiry, onExpiry }) => {
+export const CountdownPill: React.FC<CountdownPillProps> = ({ isActive, expiry, onExpiry, headless }) => {
   const [remaining, setRemaining] = useState(0);
   const startRef = useRef<number>(0);
   const onExpiryRef = useRef(onExpiry);
@@ -89,6 +96,7 @@ export const CountdownPill: React.FC<CountdownPillProps> = ({ isActive, expiry, 
   }, [isActive, expiry]);
 
   if (!isActive || remaining <= 0) return null;
+  if (headless) return null;
 
   const total = tenorToSeconds(expiry);
   const ratio = total > 0 ? remaining / total : 1;
