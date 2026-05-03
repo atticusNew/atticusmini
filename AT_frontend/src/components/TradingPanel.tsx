@@ -57,36 +57,36 @@ const Header = styled.header`
   }
 `;
 
-const LogoContainer = styled.div`
+/**
+ * Brand lockup: square Foxify logo + 'Micro Options' wordmark.
+ * Logo runs at 28px on phones / 32px on desktop with a fixed aspect
+ * ratio (the source asset is 180x180 RGBA).
+ */
+const BrandLockup = styled.div`
   display: flex;
   align-items: center;
-  height: 40px;
+  gap: 8px;
 
   img {
-    height: 32px;
-    width: auto;
+    height: 28px;
+    width: 28px;
     object-fit: contain;
-    max-width: 150px;
-    opacity: 1; /* ✅ FIX: Remove opacity for full visibility */
+    border-radius: 6px;
+  }
+
+  .wordmark {
+    font-family: var(--font-sans);
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 0.01em;
+    color: var(--text);
+    white-space: nowrap;
   }
 
   @media (min-width: 768px) {
-    height: 45px;
-    
-    img {
-      height: 36px;
-      max-width: 180px;
-    }
-  }
-`;
-
-const Logo = styled.img`
-  height: 2rem;
-  width: auto;
-  margin: 0;
-
-  @media (max-width: 768px) {
-    height: 1.75rem;
+    gap: 10px;
+    img { height: 32px; width: 32px; }
+    .wordmark { font-size: 17px; }
   }
 `;
 
@@ -803,9 +803,10 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
   return (
     <TradingContainer>
       <Header>
-        <LogoContainer>
-          <Logo src="/images/attiminlogo.png" alt="Atticus" />
-        </LogoContainer>
+        <BrandLockup aria-label="Foxify Micro Options">
+          <img src="/images/foxify-logo.png" alt="Foxify" />
+          <span className="wordmark">Micro Options</span>
+        </BrandLockup>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <CountdownPill
             isActive={tradeState.isActive}
