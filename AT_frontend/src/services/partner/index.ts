@@ -8,8 +8,13 @@
 
 import type { PartnerExchangeAdapter } from './PartnerExchangeAdapter';
 import { mockPartnerExchangeAdapter } from './MockPartnerExchangeAdapter';
+import { LedgerWritingPartnerExchange } from './LedgerWritingPartnerExchange';
+import { ledgerService } from '../ledger/LedgerService';
 
-let activeAdapter: PartnerExchangeAdapter = mockPartnerExchangeAdapter;
+let activeAdapter: PartnerExchangeAdapter = new LedgerWritingPartnerExchange(
+  mockPartnerExchangeAdapter,
+  ledgerService,
+);
 
 export const getPartnerExchange = (): PartnerExchangeAdapter => activeAdapter;
 
@@ -32,3 +37,4 @@ export type {
 } from './PartnerExchangeAdapter';
 
 export { MockPartnerExchangeAdapter, mockPartnerExchangeAdapter } from './MockPartnerExchangeAdapter';
+export { LedgerWritingPartnerExchange } from './LedgerWritingPartnerExchange';
