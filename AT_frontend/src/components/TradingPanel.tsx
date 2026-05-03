@@ -6,6 +6,7 @@ import { PriceChart } from './PriceChart';
 import { SellbackBar } from './SellbackBar';
 import { CountdownPill } from './CountdownPill';
 import { DemoPill } from './DemoPill';
+import { BalancePill } from './BalancePill';
 import { PositionsList } from './PositionsList';
 import { AccountScreen } from './AccountScreen';
 import { OnboardingModal } from './OnboardingModal';
@@ -515,35 +516,7 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
       setOptionType(null);
       setStrikeOffset(0);
 
-      // ✅ IMPROVED: Refresh balance after settlement with retry logic
-      if (!isDemoMode) {
-        const refreshBalanceWithRetry = async (attempt: number = 1, maxAttempts: number = 3) => {
-          try {
-            await refreshBalance();
-            return true;
-          } catch (error) {
-            console.warn(`⚠️ Failed to refresh balance after settlement (attempt ${attempt}):`, error);
-            if (attempt < maxAttempts) {
-              // Retry with exponential backoff
-              const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
-              setTimeout(() => refreshBalanceWithRetry(attempt + 1, maxAttempts), delay);
-            }
-            return false;
-          }
-        };
-
-        try {
-          
-          // Immediate refresh attempt
-          await refreshBalanceWithRetry(1, 3);
-          
-          // Delayed refresh attempt to ensure backend processing
-          setTimeout(() => refreshBalanceWithRetry(1, 3), 1500);
-          
-        } catch (error) {
-          console.warn('⚠️ Failed to refresh balance after settlement:', error);
-        }
-      }
+      refreshBalance().catch(() => {});
 
       if (result.outcome === 'win') {
       } else if (result.outcome === 'loss') {
@@ -753,8 +726,7 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
         setTimeout(clearStatus, 3000);
       });
 
-      // ✅ REMOVED: Balance refresh during trade to prevent oscillation
-      // Balance will be refreshed after trade completion
+      refreshBalance().catch(() => {});
 
       // ✅ REMOVED: Auto-clear trade start message - keep status visible during entire trade
       // Status will only be cleared when trade ends or user manually closes
@@ -847,10 +819,6 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
     ...(tradeState.entryPrice !== undefined && { entryPrice: tradeState.entryPrice })
   };
 
-  // ✅ REMOVED: Unused activeTradeData variable that was causing build error
-
-  useBalance();
-
   return (
     <TradingContainer>
       <Header>
@@ -865,13 +833,16 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
           />
           {isDemoMode && <DemoPill />}
         </div>
-        <DisconnectButton
-          connected={isFullyConnected}
-          isDemoMode={isDemoMode}
-          onClick={handleDisconnectClick}
-        >
-          {isDemoMode ? 'Connect' : (isFullyConnected ? 'Disconnect' : 'Reconnect')}
-        </DisconnectButton>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <BalancePill label={isDemoMode ? 'Paper' : 'Balance'} />
+          <DisconnectButton
+            connected={isFullyConnected}
+            isDemoMode={isDemoMode}
+            onClick={handleDisconnectClick}
+          >
+            {isDemoMode ? 'Exit' : (isFullyConnected ? 'Disconnect' : 'Reconnect')}
+          </DisconnectButton>
+        </div>
       </Header>
 
       <MainContent>
