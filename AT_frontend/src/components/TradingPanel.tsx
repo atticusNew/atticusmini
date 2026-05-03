@@ -373,9 +373,7 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
   // ✅ FIXED: Initialize trading service when canister is available (or in demo mode)
   useEffect(() => {
     if (isDemoMode) {
-      console.log('🎮 Demo mode: Using demo trading service');
     } else if (atticusService) {
-      console.log('✅ Atticus service available:', atticusService);
     }
   }, [atticusService, isDemoMode]);
 
@@ -409,17 +407,14 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
     const currentPrice = priceStateRef.current.current;
     
     if (!currentTradeData) {
-      console.log('⚠️ No active trade to settle');
       return;
     }
 
-    console.log('🔄 Auto-settling trade:', currentTradeData.id, 'at price:', currentPrice);
 
     try {
       // ✅ FIXED: Use actual position ID from backend instead of custom trade ID
       // The backend stores positions with numeric IDs, so we use the positionId directly
       const positionId = currentTradeData.positionId;
-      console.log('🔄 Calling settlement with positionId:', positionId);
       console.log('🔄 Trade details:', {
         positionId: currentTradeData.positionId,
         type: currentTradeData.type,
@@ -456,16 +451,12 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
           atticusService,
           user?.principal // Pass user principal
         );
-        console.log('✅ Settlement recorded to backend');
       } catch (error) {
         console.warn('⚠️ Backend settlement recording failed, but settlement calculation succeeded:', error);
         // ✅ Continue with frontend settlement display even if backend fails
         // Frontend calculation is authoritative for user experience
       }
 
-      console.log('✅ Settlement result:', result);
-      console.log('🔍 Toast calculation - result.profit:', result.profit);
-      console.log('🔍 Toast calculation - result.outcome:', result.outcome);
 
       // ✅ OPTIMIZED: Single state update for settlement result
       setTradeState(prev => ({
@@ -529,7 +520,6 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
         const refreshBalanceWithRetry = async (attempt: number = 1, maxAttempts: number = 3) => {
           try {
             await refreshBalance();
-            console.log(`✅ Balance refreshed after settlement (attempt ${attempt})`);
             return true;
           } catch (error) {
             console.warn(`⚠️ Failed to refresh balance after settlement (attempt ${attempt}):`, error);
@@ -543,7 +533,6 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
         };
 
         try {
-          console.log('🔄 Attempting to refresh balance after settlement...');
           
           // Immediate refresh attempt
           await refreshBalanceWithRetry(1, 3);
@@ -557,11 +546,8 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
       }
 
       if (result.outcome === 'win') {
-        console.log(`🎉 WIN! Profit: $${result.profit?.toFixed(2)}`);
       } else if (result.outcome === 'loss') {
-        console.log(`💸 LOSS: -$${Math.abs(result.profit || 0).toFixed(2)}`);
       } else {
-        console.log(`🔄 TIE: Refunded $${result.payout?.toFixed(2)}`);
       }
 
     } catch (error: unknown) {
@@ -603,7 +589,6 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
   };
 
   const handleExpirySelect = (expiry: string) => {
-    console.log('🕐 Expiry selected:', expiry);
     setSelectedExpiry(expiry);
     // ✅ OPTIMIZED: Removed unnecessary trade state reset to prevent re-renders
   };
@@ -615,9 +600,6 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
     expiry?: string;
   }) => {
     // ✅ DEBUG: Log what TradingPanel receives
-    console.log('🔍 TradingPanel: handleTradeStart called with contracts =', contracts);
-    console.log('🔍 TradingPanel: typeof contracts =', typeof contracts);
-    console.log('🔍 TradingPanel: overrideParams =', overrideParams);
     
     // ✅ FIX: Use override params if provided, otherwise use state
     const finalOptionType = overrideParams?.optionType || optionType;
@@ -643,13 +625,11 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
     }
 
     if (tradeState.isInProgress) {
-      console.log('Trade already in progress, ignoring request');
       return;
     }
 
     // ✅ CRITICAL: Capture price at the exact moment trade starts for perfect synchronization
     const tradeStartPrice = priceState.current || 0;
-    console.log('🎯 Trade started at price:', tradeStartPrice);
     if (!tradeStartPrice) {
       throw new Error('Price not available for trade - please refresh and try again');
     }
@@ -698,7 +678,6 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
         size: contracts,
       };
 
-      console.log('🕐 Trade request with expiry:', finalExpiry);
 
       console.log('🔍 Debug - Calling pricingEngine.placeTrade with:', {
         userPrincipal: isDemoMode ? 'demo-user' : user?.principal,
@@ -709,7 +688,6 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
       });
 
       // ✅ ASYNC TRADE PROCESSING: Run trade in parallel with price updates
-      console.log('🚀 Starting async trade processing...');
       setTradeState(prev => ({ ...prev, statusMessage: 'Executing trade...' }));
       
       // ✅ NEW: Use off-chain trade placement (faster, more accurate)
@@ -749,7 +727,6 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
         amount: contracts
       };
 
-      console.log('🕐 Trade data with expiry:', finalExpiry);
 
       // ✅ OPTIMIZED: Single state update with captured price for perfect synchronization
       setTradeState({
@@ -794,7 +771,6 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
         }
       }
 
-      console.log('🚀 Trade started via trading service! Order ID:', orderId);
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -824,7 +800,6 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
 
   const handleTradeClose = async () => {
     try {
-      console.log('🔄 Manually closing trade...');
       
       // ✅ COMPLETE: Reset all trade-related state
       setTradeState({
@@ -840,7 +815,6 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
       setOptionType(null);
       setStrikeOffset(0);
       
-      console.log('✅ Trade manually closed and state reset');
     } catch (error) {
       console.error('❌ Failed to close trade:', error);
     }

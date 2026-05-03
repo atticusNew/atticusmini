@@ -61,12 +61,10 @@ export class OffChainPricingEngine {
    */
   private connectToPriceFeed(): void {
     try {
-      console.log('🔌 Connecting to Coinbase WebSocket feed...');
       
       this.wsConnection = new WebSocket('wss://ws-feed.exchange.coinbase.com');
       
       this.wsConnection.onopen = () => {
-        console.log('✅ Connected to Coinbase WebSocket');
         this.isConnected = true;
         this.reconnectAttempts = 0;
         
@@ -91,7 +89,6 @@ export class OffChainPricingEngine {
       };
 
       this.wsConnection.onclose = () => {
-        console.log('🔌 WebSocket connection closed');
         this.isConnected = false;
         this.handleReconnect();
       };
@@ -157,7 +154,6 @@ export class OffChainPricingEngine {
       // Log significant price changes
       const priceDifference = Math.abs(currentPrice - previousPrice);
       if (priceDifference >= 0.01) {
-        console.log(`📊 Price update: $${previousPrice.toFixed(2)} → $${currentPrice.toFixed(2)}`);
       }
     }
   }
@@ -171,7 +167,6 @@ export class OffChainPricingEngine {
       this.reconnectAttempts++;
       const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
       
-      console.log(`🔄 Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
       
       setTimeout(() => {
         this.connectToPriceFeed();
