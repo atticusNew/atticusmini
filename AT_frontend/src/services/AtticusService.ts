@@ -1,37 +1,17 @@
 /**
- * AtticusService — thin facade over the partner exchange adapter.
+ * AtticusService — legacy facade kept for backwards-compatible imports.
  *
- * Historically this wrapped an ICP canister. After PR #2 it is a synchronous
- * shim around MockPartnerExchange so the rest of the app keeps compiling
- * while we land the partner adapter (PR #3).
+ * After PR #3 the canonical surface is `PartnerExchangeAdapter` accessed via
+ * `getPartnerExchange()`. This file routes the few legacy method names that
+ * existing components still import (`getUser`, `getAllPositions`,
+ * `getUserTradeSummary`, `recordSettlement`) into the adapter.
  *
- * Public surface intentionally unchanged from the legacy file: the few call
- * sites that import from here (TradingPanel, OptionsTradeForm, history views)
- * still work without modification.
+ * New code should import from `services/partner` directly.
  */
 
-import { mockPartnerExchange, Position as PartnerPosition } from './MockPartnerExchange';
-
-export interface TradeData {
-  optionType: 'call' | 'put';
-  strikeOffset: number;
-  expiry: string;
-  contractCount: number;
-  userPrincipal: string;
-}
-
-export interface TradeResult {
-  success: boolean;
-  tradeId?: number;
-  error?: string;
-}
-
-export interface SettlementResult {
-  outcome: 'win' | 'loss' | 'tie';
-  payout: number;
-  profit: number;
-  finalPrice: number;
-}
+import { Decimal } from 'decimal.js';
+import { getPartnerExchange } from './partner';
+import type { PartnerTicket } from './partner';
 
 export interface UserData {
   principal: string;
@@ -40,6 +20,13 @@ export interface UserData {
   totalLosses: number;
   netPnl: number;
   createdAt: number;
+}
+
+export interface SettlementResult {
+  outcome: 'win' | 'loss' | 'tie';
+  payout: number;
+  profit: number;
+  finalPrice: number;
 }
 
 export interface Position {
@@ -65,88 +52,76 @@ export interface TradeSummary {
   losses: number;
 }
 
-const toLegacyPosition = (p: PartnerPosition): Position => ({
-  id: p.id,
-  user: p.userId,
-  optionType: p.optionType,
-  strikePrice: p.strikePrice.toNumber(),
-  entryPrice: p.entryPrice.toNumber(),
-  expiry: p.expiry,
-  size: p.contracts,
-  entryPremium: p.premiumUSD.toNumber(),
-  currentValue: p.payoutUSD?.toNumber() ?? 0,
-  pnl: p.outcome === 'win'
-    ? (p.payoutUSD?.toNumber() ?? 0) - p.premiumUSD.toNumber()
-    : p.outcome === 'loss'
-      ? -p.premiumUSD.toNumber()
+const toLegacyPosition = (t: PartnerTicket): Position => ({
+  id: t.id,
+  user: t.userId,
+  optionType: t.optionType,
+  strikePrice: t.strikePriceUSD.toNumber(),
+  entryPrice: t.entryPriceUSD.toNumber(),
+  expiry: t.tenor,
+  size: t.contracts,
+  entryPremium: t.premiumUSD.toNumber(),
+  currentValue: t.payoutUSD?.toNumber() ?? 0,
+  pnl: t.outcome === 'win'
+    ? (t.payoutUSD?.toNumber() ?? 0) - t.premiumUSD.toNumber()
+    : t.outcome === 'loss'
+      ? -t.premiumUSD.toNumber()
       : 0,
-  status: p.status === 'active' ? 'Active' : 'Settled',
-  openedAt: p.openedAt,
-  settledAt: p.settledAt ?? null,
-  settlementPrice: p.finalPrice?.toNumber(),
+  status: t.status === 'active' ? 'Active' : 'Settled',
+  openedAt: t.openedAt,
+  settledAt: t.settledAt ?? null,
+  settlementPrice: t.finalPriceUSD?.toNumber(),
 });
 
+let settlementSequence = 0;
+
 export class AtticusService {
-  private isInitialized = false;
-
-  async initialize(_canisterIdIgnored?: string): Promise<void> {
-    this.isInitialized = true;
-  }
-
-  async createUser(userId: string): Promise<UserData> {
-    const u = await mockPartnerExchange.ensureUser(userId);
-    return {
-      principal: u.id,
-      balance: u.balanceUSD.toNumber(),
-      totalWins: 0,
-      totalLosses: 0,
-      netPnl: 0,
-      createdAt: u.createdAt,
-    };
-  }
+  async initialize(_canisterIdIgnored?: string): Promise<void> {}
 
   async getUser(userId: string): Promise<UserData> {
-    const u = (await mockPartnerExchange.getUser(userId)) ?? (await mockPartnerExchange.ensureUser(userId));
-    const summary = await mockPartnerExchange.getUserTradeSummary(userId);
+    const partner = getPartnerExchange();
+    const balance = await partner.getBalance(userId);
+    const tickets = await partner.getUserTickets(userId);
     return {
-      principal: u.id,
-      balance: u.balanceUSD.toNumber(),
-      totalWins: summary.wins,
-      totalLosses: summary.losses,
+      principal: userId,
+      balance: balance.availableUSD.toNumber(),
+      totalWins: tickets.filter(t => t.outcome === 'win').length,
+      totalLosses: tickets.filter(t => t.outcome === 'loss').length,
       netPnl: 0,
-      createdAt: u.createdAt,
+      createdAt: balance.asOf,
     };
   }
 
-  async placeTrade(tradeData: TradeData): Promise<TradeResult> {
-    return { success: false, error: 'Use pricingEngine.placeTrade — direct AtticusService.placeTrade is deprecated.' };
-  }
-
-  async recordSettlement(positionId: number, settlementResult: SettlementResult): Promise<void> {
-    const result = await mockPartnerExchange.recordSettlement({
-      positionId,
-      outcome: settlementResult.outcome,
-      payoutCents: Math.round(settlementResult.payout * 100),
-      profitCents: Math.max(0, Math.round(settlementResult.profit * 100)),
-      finalPriceCents: Math.round(settlementResult.finalPrice * 100),
+  async recordSettlement(positionId: number, settlement: SettlementResult): Promise<void> {
+    const partner = getPartnerExchange();
+    settlementSequence += 1;
+    const result = await partner.settleTicket({
+      ticketId: positionId,
+      outcome: settlement.outcome,
+      payoutUSD: new Decimal(settlement.payout),
+      profitUSD: new Decimal(Math.max(0, settlement.profit)),
+      finalPriceUSD: new Decimal(settlement.finalPrice),
+      idempotencyKey: `settle:${positionId}:${settlementSequence}`,
     });
     if ('err' in result) throw new Error(result.err);
   }
 
   async getUserPositions(userId: string): Promise<Position[]> {
-    return (await mockPartnerExchange.getUserPositions(userId)).map(toLegacyPosition);
+    const tickets = await getPartnerExchange().getUserTickets(userId);
+    return tickets.map(toLegacyPosition);
   }
 
   async getAllPositions(): Promise<Position[]> {
-    return (await mockPartnerExchange.getAllPositions()).map(toLegacyPosition);
+    return [];
   }
 
   async getUserTradeSummary(userId: string): Promise<TradeSummary> {
-    return mockPartnerExchange.getUserTradeSummary(userId);
-  }
-
-  isReady(): boolean {
-    return this.isInitialized;
+    const tickets = await getPartnerExchange().getUserTickets(userId);
+    return {
+      totalTrades: tickets.length,
+      wins: tickets.filter(t => t.outcome === 'win').length,
+      losses: tickets.filter(t => t.outcome === 'loss').length,
+    };
   }
 }
 

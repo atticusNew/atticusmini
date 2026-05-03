@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { mockPartnerExchange } from '../services/MockPartnerExchange';
+import { getPartnerExchange } from '../services/partner';
 
 /**
  * useUnifiedAuth — temporary stub.
@@ -13,15 +13,11 @@ import { mockPartnerExchange } from '../services/MockPartnerExchange';
 
 export interface UnifiedUser {
   principal: string;
-  authMethod: 'demo';
+  authMethod: 'partner';
   displayName?: string;
+  countryCode?: string;
+  isLive: boolean;
 }
-
-const DEMO_USER: UnifiedUser = {
-  principal: 'demo-user',
-  authMethod: 'demo',
-  displayName: 'Demo Trader',
-};
 
 export const useUnifiedAuth = () => {
   const [user, setUser] = useState<UnifiedUser | null>(null);
@@ -29,16 +25,35 @@ export const useUnifiedAuth = () => {
   const [error] = useState<string | null>(null);
 
   useEffect(() => {
-    mockPartnerExchange.ensureUser(DEMO_USER.principal).finally(() => {
-      setUser(DEMO_USER);
-      setIsLoading(false);
-    });
+    let cancelled = false;
+    getPartnerExchange()
+      .getSession()
+      .then(session => {
+        if (cancelled || !session) return;
+        setUser({
+          principal: session.partnerUserId,
+          authMethod: 'partner',
+          displayName: session.displayName,
+          countryCode: session.countryCode,
+          isLive: session.isLive,
+        });
+      })
+      .finally(() => { if (!cancelled) setIsLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
   const signIn = useCallback(async () => {
-    await mockPartnerExchange.ensureUser(DEMO_USER.principal);
-    setUser(DEMO_USER);
-    return DEMO_USER;
+    const session = await getPartnerExchange().getSession();
+    if (!session) return null;
+    const next: UnifiedUser = {
+      principal: session.partnerUserId,
+      authMethod: 'partner',
+      displayName: session.displayName,
+      countryCode: session.countryCode,
+      isLive: session.isLive,
+    };
+    setUser(next);
+    return next;
   }, []);
 
   const logout = useCallback(async () => {
