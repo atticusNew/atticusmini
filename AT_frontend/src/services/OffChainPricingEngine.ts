@@ -6,6 +6,7 @@
 
 import { Decimal } from 'decimal.js';
 import { getPartnerExchange } from './partner';
+import { realizedVolatility } from './pricing/realizedVolatility';
 
 export interface PriceData {
   current: number;
@@ -117,8 +118,9 @@ export class OffChainPricingEngine {
       const timestamp = Date.now();
       const previousPrice = this.currentPrice;
       this.currentPrice = currentPrice;
-      
-      // Store price history
+
+      realizedVolatility.observe(currentPrice, timestamp);
+
       this.priceHistory.push({ timestamp, price: currentPrice });
       
       // Keep only last 1000 prices to prevent memory issues
