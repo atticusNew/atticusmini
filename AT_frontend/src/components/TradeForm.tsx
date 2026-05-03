@@ -41,10 +41,10 @@ const STAKE_MIN = 1;
 const STAKE_MAX = 100;
 
 const Container = styled(Card)`
-  padding: 16px;
+  padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 14px;
 `;
 
 const Section = styled.div`
@@ -67,16 +67,17 @@ const DirectionGroup = styled.div`
 
 const DirectionButton = styled.button<{ active?: boolean; tone: 'up' | 'down' }>`
   appearance: none;
-  border: 1px solid ${p => (p.active ? (p.tone === 'up' ? 'var(--up)' : 'var(--down)') : 'var(--border)')};
+  border: 1.5px solid ${p =>
+    p.active ? (p.tone === 'up' ? 'var(--up)' : 'var(--down)') : 'var(--border)'};
   background: ${p =>
     p.active ? (p.tone === 'up' ? 'var(--up-dim)' : 'var(--down-dim)') : 'var(--bg-elev-2)'};
-  color: ${p => (p.active ? (p.tone === 'up' ? 'var(--up)' : 'var(--down)') : 'var(--text-dim)')};
-  border-radius: 12px;
-  padding: 14px 16px;
+  color: ${p => (p.active ? (p.tone === 'up' ? 'var(--up)' : 'var(--down)') : 'var(--text)')};
+  border-radius: 14px;
+  padding: 18px 16px;
   font-family: var(--font-sans);
-  font-weight: 700;
-  font-size: 16px;
-  letter-spacing: 0.04em;
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: 0.06em;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -84,12 +85,8 @@ const DirectionButton = styled.button<{ active?: boolean; tone: 'up' | 'down' }>
   cursor: pointer;
   transition: 120ms ease-out;
   &:disabled { opacity: 0.5; cursor: not-allowed; }
-  small {
-    font-size: 11px;
-    font-weight: 500;
-    letter-spacing: 0.08em;
-    opacity: 0.7;
-    text-transform: uppercase;
+  &:hover:not(:disabled) {
+    border-color: ${p => (p.tone === 'up' ? 'var(--up)' : 'var(--down)')};
   }
 `;
 
@@ -368,7 +365,6 @@ export const TradeForm: React.FC<TradeFormProps> = ({
   return (
     <Container>
       <Section>
-        <Label>Direction</Label>
         <DirectionGroup>
           <DirectionButton
             type="button"
@@ -376,8 +372,9 @@ export const TradeForm: React.FC<TradeFormProps> = ({
             active={optionType === 'call'}
             disabled={isTradeActive || isTradeInProgress}
             onClick={() => handleDirection('call')}
+            aria-label="Bet that BTC will go up"
           >
-            ↑ UP <small>CALL</small>
+            ▲ UP
           </DirectionButton>
           <DirectionButton
             type="button"
@@ -385,8 +382,9 @@ export const TradeForm: React.FC<TradeFormProps> = ({
             active={optionType === 'put'}
             disabled={isTradeActive || isTradeInProgress}
             onClick={() => handleDirection('put')}
+            aria-label="Bet that BTC will go down"
           >
-            ↓ DOWN <small>PUT</small>
+            ▼ DOWN
           </DirectionButton>
         </DirectionGroup>
       </Section>
@@ -436,7 +434,6 @@ export const TradeForm: React.FC<TradeFormProps> = ({
       </Section>
 
       <Section>
-        <Label>Tenor</Label>
         <ChipGrid4>
           {TENORS.map(t => (
             <Chip
