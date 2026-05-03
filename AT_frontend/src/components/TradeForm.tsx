@@ -24,7 +24,17 @@ export interface TradeFormProps {
   ) => Promise<void>;
 }
 
-const STRIKE_OFFSETS = [5, 10, 25, 50, 100] as const;
+/**
+ * v2: 4 strike offsets paired with novice-friendly distance tags.
+ * Order is close → far, so payout multiple grows left → right and the
+ * grid mirrors the close/near/reach/far mental model.
+ */
+const STRIKE_TIERS: ReadonlyArray<{ offset: number; tag: string }> = [
+  { offset: 5,   tag: 'close' },
+  { offset: 10,  tag: 'near' },
+  { offset: 25,  tag: 'reach' },
+  { offset: 50,  tag: 'far' },
+];
 const TENORS: Tenor[] = ['30s', '1m', '5m', '15m'];
 const STAKE_PRESETS = [1, 5, 25, 100] as const;
 const STAKE_MIN = 1;
@@ -40,12 +50,6 @@ const Container = styled(Card)`
 const Section = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 8px;
-`;
-
-const Row = styled.div`
-  display: flex;
-  flex-wrap: wrap;
   gap: 8px;
 `;
 
@@ -92,37 +96,71 @@ const DirectionButton = styled.button<{ active?: boolean; tone: 'up' | 'down' }>
 const StrikeChipInner = styled.div`
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: 2px;
 `;
 
-const StrikeChip = styled.button<{ active?: boolean; tone: 'up' | 'down' }>`
+/**
+ * v2: chip headline is the absolute target price (the number the
+ * trader sees on the chart's strike line) — not the offset jargon.
+ * Direction tints the border so the picker visually inherits the
+ * UP/DOWN choice the trader just made.
+ */
+const StrikeChip = styled.button<{ active?: boolean; tone: 'up' | 'down' | 'neutral' }>`
   appearance: none;
-  border: 1px solid ${p => (p.active ? (p.tone === 'up' ? 'var(--up)' : 'var(--down)') : 'var(--border)')};
+  border: 1px solid ${p => {
+    if (!p.active && p.tone === 'neutral') return 'var(--border)';
+    if (p.active) return p.tone === 'up' ? 'var(--up)' : p.tone === 'down' ? 'var(--down)' : 'var(--border-strong)';
+    return p.tone === 'up' ? 'rgba(27,196,125,0.4)' : p.tone === 'down' ? 'rgba(255,93,108,0.4)' : 'var(--border)';
+  }};
   background: ${p => (p.active ? 'var(--bg-elev-2)' : 'transparent')};
   border-radius: 10px;
-  padding: 8px 12px;
+  padding: 10px 8px;
   cursor: pointer;
   color: var(--text);
   font-family: var(--font-sans);
-  text-align: left;
+  text-align: center;
   transition: 120ms ease-out;
   &:disabled { opacity: 0.45; cursor: not-allowed; }
   &:hover:not(:disabled) {
-    border-color: ${p => (p.tone === 'up' ? 'var(--up)' : 'var(--down)')};
+    border-color: ${p => (p.tone === 'up' ? 'var(--up)' : p.tone === 'down' ? 'var(--down)' : 'var(--border-strong)')};
   }
-  span.offset {
+  .target {
     font-weight: 700;
     font-size: 13px;
-    color: ${p => (p.tone === 'up' ? 'var(--up)' : 'var(--down)')};
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
+    color: var(--text);
+    line-height: 1.1;
   }
-  span.meta {
-    font-size: 11px;
+  .distance {
+    font-size: 10px;
     color: var(--text-dim);
     letter-spacing: 0.02em;
+    text-transform: lowercase;
   }
+  .mult {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 11px;
+    font-weight: 700;
+    color: ${p => (p.tone === 'up' ? 'var(--up)' : p.tone === 'down' ? 'var(--down)' : 'var(--text-dim)')};
+  }
+`;
+
+const StrikeGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+`;
+
+const StrikeIntro = styled.div`
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+  line-height: 1.35;
+  .em { color: var(--text); font-weight: 600; }
 `;
 
 const StakeRow = styled.div`
@@ -220,14 +258,6 @@ const Cta = styled(Button).attrs({ variant: 'primary' as const, size: 'lg' as co
   padding: 16px;
   font-size: 17px;
   letter-spacing: 0.04em;
-`;
-
-const ContextLine = styled.div`
-  font-family: var(--font-sans);
-  font-size: 12px;
-  color: var(--text-dim);
-  text-align: center;
-  span.strike { color: var(--text); font-family: var(--font-mono); }
 `;
 
 const ErrorLine = styled.div`
@@ -362,9 +392,16 @@ export const TradeForm: React.FC<TradeFormProps> = ({
       </Section>
 
       <Section>
-        <Label>Strike</Label>
-        <Row>
-          {STRIKE_OFFSETS.map(offset => {
+        <Label>Target price</Label>
+        <StrikeIntro>
+          {!optionType
+            ? <>Pick <span className="em">UP</span> or <span className="em">DOWN</span> first, then choose a target price.</>
+            : optionType === 'call'
+              ? <>BTC must close <span className="em">above</span> the price you pick in <span className="em">{tenor}</span>.</>
+              : <>BTC must close <span className="em">below</span> the price you pick in <span className="em">{tenor}</span>.</>}
+        </StrikeIntro>
+        <StrikeGrid>
+          {STRIKE_TIERS.map(({ offset, tag }) => {
             const q = optionType && currentPrice
               ? pricingService.quote({
                   optionType,
@@ -374,28 +411,28 @@ export const TradeForm: React.FC<TradeFormProps> = ({
                   contracts: stake,
                 })
               : null;
-            const probPct = q ? Math.round(q.digitalProb * 100) : null;
+            const target = q ? q.strikeUSD : null;
             const mult = q ? q.payoutMultiple : null;
-            const sign = direction === 'call' ? '+' : '-';
             return (
               <StrikeChip
                 type="button"
                 key={offset}
-                tone={tone}
+                tone={optionType ? tone : 'neutral'}
                 active={strikeOffset === offset}
                 disabled={!optionType || isTradeActive || isTradeInProgress}
                 onClick={() => handleStrike(offset)}
               >
                 <StrikeChipInner>
-                  <span className="offset">{sign}${offset}</span>
-                  <span className="meta">
-                    {probPct != null ? `${probPct}% likely · ${mult!.toFixed(2)}×` : 'pick UP or DOWN first'}
+                  <span className="target">
+                    {target != null ? `$${formatUSD(target)}` : `±$${offset}`}
                   </span>
+                  <span className="distance">{tag}</span>
+                  <span className="mult">{mult != null ? `${mult.toFixed(1)}×` : '—'}</span>
                 </StrikeChipInner>
               </StrikeChip>
             );
           })}
-        </Row>
+        </StrikeGrid>
       </Section>
 
       <Section>
