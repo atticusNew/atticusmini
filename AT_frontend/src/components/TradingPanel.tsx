@@ -334,6 +334,32 @@ interface TradeData {
   quotedPayoutMultiple?: number;
 }
 
+/**
+ * Auto-scroll the chart into view after a trade is placed.
+ *
+ * Triggers when the device is touch-primary OR the viewport is too short
+ * for the chart + active-ticket card to both fit above the fold (≈700px).
+ * On laptops with a tall window we leave the layout alone — the user
+ * already sees both surfaces.
+ *
+ * Uses requestAnimationFrame so the DOM has reflowed with the new
+ * ActiveTicketCard before we measure / scroll.
+ */
+const scrollChartIntoView = (): void => {
+  if (typeof window === 'undefined') return;
+  const isTouchPrimary = window.matchMedia?.('(pointer: coarse)').matches ?? false;
+  const isShortViewport = window.innerHeight < 700;
+  if (!isTouchPrimary && !isShortViewport) return;
+  requestAnimationFrame(() => {
+    const el = document.querySelector('[data-chart-section]');
+    if (el && 'scrollIntoView' in el) {
+      (el as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  });
+};
+
 export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode = false, onConnectWallet, shouldOpenHelp, onHelpOpened }) => {
   const { priceState, isConnected: priceConnected } = useSynchronizedPrice();
   const { isConnected: canisterConnected, atticusService } = useCanister();
@@ -683,20 +709,7 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
       toastTradePlaced({ direction: finalOptionType, stake: contracts, tenor: finalExpiry });
       refreshBalance().catch(() => {});
       setActiveTab('trade');
-
-      // Auto-scroll to show chart on mobile
-      if (window.innerWidth <= 767) {
-        // ✅ FIX: Scroll to chart section to make it visible after trade
-        const chartSection = document.querySelector('[data-chart-section]');
-        if (chartSection) {
-          chartSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        } else {
-          // Fallback: scroll to show chart area (header height + some padding)
-          window.scrollTo({ top: 100, behavior: 'smooth' });
-        }
-      }
-
-
+      scrollChartIntoView();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('❌ Failed to start trade:', errorMessage);
