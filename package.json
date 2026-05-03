@@ -5,6 +5,7 @@
   "scripts": {
     "postinstall": "cd AT_frontend && npm install --no-audit --no-fund",
     "build": "cd AT_frontend && npm run build && cd .. && rm -rf dist && cp -R AT_frontend/dist dist",
+    "start": "node server.mjs",
     "preview": "cd AT_frontend && npm run preview",
     "typecheck": "cd AT_frontend && npm run typecheck"
   }
