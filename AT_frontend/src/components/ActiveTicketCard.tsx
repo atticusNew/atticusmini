@@ -1,11 +1,11 @@
 /**
  * ActiveTicketCard — hero surface for an open position.
  *
- * Replaces the TradeForm in the Trade tab while a ticket is live. Combines
- * the previously-fragmented "trade-active banner" + chart-overlay
- * `SellbackBar` into a single card that shows direction, frozen strike,
- * time remaining, live mark-to-market, and the sell-back CTA. Hold-to-
- * expiry users see the same surface; nothing on the chart-side moves.
+ * v2: simplified for novices. Three things matter while a trade is live:
+ * (1) am I winning right now, (2) how much time is left, (3) can I take
+ * the money and run. Everything else (strike absolute, entry, stake →
+ * win) is ambient context summed up in one thin line. The "Hold to
+ * expiry" button is gone — that's what doing nothing means.
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
@@ -26,7 +26,6 @@ interface ActiveTicketCardProps {
   stake: number;
   potentialPayout: number;
   onSold: () => void;
-  onWaiting?: () => void;
 }
 
 const Wrap = styled(Card)`
@@ -69,38 +68,13 @@ const Timer = styled.div<{ tone: 'normal' | 'warn' | 'critical' }>`
     p.tone === 'critical' ? 'var(--down)' : p.tone === 'warn' ? 'var(--accent)' : 'var(--text)'};
 `;
 
-const StatGrid = styled.div`
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px 14px;
-  background: var(--bg-elev-2);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px;
-`;
-
-const Stat = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-`;
-
-const StatLabel = styled.span`
+const ContextLine = styled.div`
   font-family: var(--font-sans);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 12px;
   color: var(--text-dim);
-`;
-
-const StatValue = styled.span`
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--text);
+  text-align: center;
+  line-height: 1.4;
+  .em { color: var(--text); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 `;
 
 const Hero = styled.div<{ tone: 'pos' | 'neg' | 'flat' }>`
@@ -145,22 +119,17 @@ const Hero = styled.div<{ tone: 'pos' | 'neg' | 'flat' }>`
   }
 `;
 
-const Actions = styled.div`
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-`;
-
 const SellButton = styled.button`
   appearance: none;
+  width: 100%;
   background: var(--accent);
   color: #1a1410;
   border: none;
   border-radius: 12px;
-  padding: 14px;
+  padding: 16px;
   font-family: var(--font-sans);
-  font-weight: 700;
-  font-size: 14px;
+  font-weight: 800;
+  font-size: 16px;
   letter-spacing: 0.04em;
   cursor: pointer;
   transition: 120ms ease-out;
@@ -168,28 +137,14 @@ const SellButton = styled.button`
   &:disabled { opacity: 0.45; cursor: not-allowed; }
 `;
 
-const HoldButton = styled.button`
-  appearance: none;
-  background: transparent;
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 14px;
-  font-family: var(--font-sans);
+const LockoutHint = styled.div<{ tone: 'normal' | 'warn' }>`
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
   font-weight: 600;
-  font-size: 14px;
-  letter-spacing: 0.04em;
-  cursor: pointer;
-  transition: 120ms ease-out;
-  &:hover { border-color: var(--border-strong); }
-`;
-
-const Reason = styled.div`
-  font-family: var(--font-sans);
-  font-size: 12px;
-  color: var(--text-dim);
   text-align: center;
-  font-style: italic;
+  color: ${p => (p.tone === 'warn' ? 'var(--accent)' : 'var(--text-dim)')};
+  letter-spacing: 0.04em;
 `;
 
 const formatUSD = (n: number): string =>
@@ -205,8 +160,8 @@ const formatRemaining = (s: number): string => {
 
 export const ActiveTicketCard: React.FC<ActiveTicketCardProps> = props => {
   const {
-    ticketId, spotUSD, optionType, strikePrice, entryPrice, tenor,
-    stake, potentialPayout, onSold, onWaiting,
+    ticketId, spotUSD, optionType, strikePrice, entryPrice: _entryPrice, tenor,
+    stake: _stake, potentialPayout: _potentialPayout, onSold,
   } = props;
 
   const [ticket, setTicket] = useState<PartnerTicket | null>(null);
@@ -244,6 +199,8 @@ export const ActiveTicketCard: React.FC<ActiveTicketCardProps> = props => {
     pnl > 0.005 ? 'pos' : pnl < -0.005 ? 'neg' : 'flat';
 
   const inTheMoney = optionType === 'call' ? spotUSD > strikePrice : spotUSD < strikePrice;
+  const lockoutTone: 'normal' | 'warn' =
+    quote && quote.secondsUntilLockout > 0 && quote.secondsUntilLockout <= 10 ? 'warn' : 'normal';
 
   const handleSell = async () => {
     if (!quote || !quote.available || submitting) return;
@@ -267,49 +224,46 @@ export const ActiveTicketCard: React.FC<ActiveTicketCardProps> = props => {
     <Wrap aria-live="polite">
       <HeaderRow>
         <DirectionTag tone={optionType === 'call' ? 'up' : 'down'}>
-          {optionType === 'call' ? '↑ CALL' : '↓ PUT'}
+          {optionType === 'call' ? '↑ UP' : '↓ DOWN'} · target ${formatUSD(strikePrice)}
         </DirectionTag>
         <Timer tone={timerTone}>{formatRemaining(remaining)}</Timer>
       </HeaderRow>
 
-      <StatGrid>
-        <Stat>
-          <StatLabel>Strike</StatLabel>
-          <StatValue>${formatUSD(strikePrice)}</StatValue>
-        </Stat>
-        <Stat>
-          <StatLabel>Spot</StatLabel>
-          <StatValue style={{ color: inTheMoney ? 'var(--up)' : 'var(--down)' }}>
-            ${formatUSD(spotUSD)}
-          </StatValue>
-        </Stat>
-        <Stat>
-          <StatLabel>Entry</StatLabel>
-          <StatValue>${formatUSD(entryPrice)}</StatValue>
-        </Stat>
-        <Stat>
-          <StatLabel>Stake → Win</StatLabel>
-          <StatValue>${formatUSD(stake)} → ${formatUSD(potentialPayout)}</StatValue>
-        </Stat>
-      </StatGrid>
-
       <Hero tone={heroTone}>
-        <span className="label">Sell back now</span>
+        <span className="label">If you sell now</span>
         <span className="now">${formatUSD(refund)}</span>
         <span className="pnl">
-          {heroTone === 'flat' ? '— flat —' : `${pnl >= 0 ? '+' : '−'}$${formatUSD(Math.abs(pnl))} vs stake`}
+          {heroTone === 'flat'
+            ? '— flat —'
+            : `${pnl >= 0 ? '+' : '−'}$${formatUSD(Math.abs(pnl))}`}
         </span>
       </Hero>
 
+      <ContextLine>
+        BTC <span className="em" style={{ color: inTheMoney ? 'var(--up)' : 'var(--down)' }}>
+          ${formatUSD(spotUSD)}
+        </span> · {inTheMoney ? 'winning' : 'needs to move'}
+      </ContextLine>
+
       {!quote || quote.available ? (
-        <Actions>
-          <HoldButton onClick={() => onWaiting?.()} type="button">Hold to expiry</HoldButton>
-          <SellButton onClick={handleSell} disabled={!quote || !quote.available || submitting} type="button">
-            {submitting ? 'Selling…' : `Sell $${formatUSD(refund)}`}
+        <>
+          <SellButton
+            onClick={handleSell}
+            disabled={!quote || !quote.available || submitting}
+            type="button"
+          >
+            {submitting ? 'Selling…' : `Sell now · $${formatUSD(refund)}`}
           </SellButton>
-        </Actions>
+          {quote && quote.secondsUntilLockout > 0 && quote.secondsUntilLockout <= 30 && (
+            <LockoutHint tone={lockoutTone}>
+              Sell-back closes in {quote.secondsUntilLockout}s
+            </LockoutHint>
+          )}
+        </>
       ) : (
-        <Reason>{quote.reason ?? 'Sell-back unavailable'}</Reason>
+        <ContextLine style={{ fontStyle: 'italic' }}>
+          {quote.reason ?? 'Sell-back unavailable'} — letting it ride to expiry.
+        </ContextLine>
       )}
     </Wrap>
   );
