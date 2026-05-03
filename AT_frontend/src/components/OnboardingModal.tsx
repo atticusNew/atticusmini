@@ -1,132 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
 import styled from 'styled-components';
-
-const ModalOverlay = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 1rem;
-`;
-
-const ModalContainer = styled.div`
-  background: var(--bg-panel);
-  border-radius: 16px;
-  border: 1px solid var(--border);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-  max-width: 480px;
-  width: 100%;
-  max-height: 90vh;
-  overflow-y: auto;
-`;
-
-const ModalHeader = styled.div`
-  padding: 1.5rem 1.5rem 0 1.5rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-`;
-
-const ModalTitle = styled.h2`
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--text);
-  margin: 0;
-`;
-
-const CloseButton = styled.button`
-  background: none;
-  border: none;
-  color: var(--text-dim);
-  font-size: 1.5rem;
-  cursor: pointer;
-  padding: 0.25rem;
-  border-radius: 4px;
-  transition: all 0.2s ease;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: var(--text);
-  }
-`;
-
-const ModalContent = styled.div`
-  padding: 1.5rem;
-`;
-
-const InstructionsList = styled.ol`
-  color: var(--text);
-  font-size: 1rem;
-  line-height: 1.6;
-  margin: 0;
-  padding-left: 1.5rem;
-`;
-
-const InstructionItem = styled.li`
-  margin-bottom: 1rem;
-  font-weight: 500;
-
-  &:last-child {
-    margin-bottom: 0;
-  }
-`;
-
-const ModalFooter = styled.div`
-  padding: 0 1.5rem 1.5rem 1.5rem;
-  display: flex;
-  gap: 1rem;
-  justify-content: flex-end;
-`;
-
-const Button = styled.button<{ variant?: 'primary' | 'secondary' }>`
-  padding: 0.75rem 1.5rem;
-  border: none;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-
-  ${props => props.variant === 'primary' ? `
-    background: var(--accent);
-    color: var(--bg-primary);
-    
-    &:hover {
-      background: #e6c035;
-      transform: translateY(-1px);
-    }
-  ` : `
-    background: var(--bg-button);
-    color: var(--text);
-    border: 1px solid var(--border);
-    
-    &:hover {
-      background: var(--bg-button-hover);
-      transform: translateY(-1px);
-    }
-  `}
-`;
-
-const CheckboxContainer = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-  font-size: 0.9rem;
-  color: var(--text-dim);
-`;
-
-const Checkbox = styled.input`
-  width: 16px;
-  height: 16px;
-  accent-color: var(--accent);
-`;
 
 interface OnboardingModalProps {
   isOpen: boolean;
@@ -134,98 +7,168 @@ interface OnboardingModalProps {
   onDontShowAgain: () => void;
 }
 
-export const OnboardingModal: React.FC<OnboardingModalProps> = ({
-  isOpen,
-  onClose,
-  onDontShowAgain
-}) => {
-  const [dontShowAgain, setDontShowAgain] = React.useState(false);
+const Backdrop = styled.div`
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 11, 16, 0.84);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+`;
 
+const Sheet = styled.div`
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 360px;
+  padding: 24px 22px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-family: var(--font-sans);
+`;
+
+const StepEyebrow = styled.div`
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+`;
+
+const Title = styled.h2`
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+`;
+
+const Body = styled.p`
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-dim);
+  strong { color: var(--text); font-weight: 600; }
+  span.up { color: var(--up); font-weight: 600; }
+  span.down { color: var(--down); font-weight: 600; }
+`;
+
+const Dots = styled.div`
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+`;
+
+const Dot = styled.span<{ active?: boolean }>`
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: ${p => (p.active ? 'var(--accent)' : 'var(--border-strong)')};
+  transition: 120ms ease-out;
+`;
+
+const Actions = styled.div`
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+`;
+
+const Primary = styled.button`
+  flex: 1;
+  appearance: none;
+  background: var(--accent);
+  color: #1a1410;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: 120ms ease-out;
+  &:hover { background: var(--accent-hover); }
+`;
+
+const Ghost = styled.button`
+  appearance: none;
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  &:hover { color: var(--text); border-color: var(--border-strong); }
+`;
+
+const STEPS: ReadonlyArray<{ eyebrow: string; title: string; body: React.ReactNode }> = [
+  {
+    eyebrow: 'Welcome',
+    title: 'Atticus binary options',
+    body: (
+      <>
+        Pick a direction, a strike, and a window. If BTC ends on your side, you collect.
+        It's that simple.
+      </>
+    ),
+  },
+  {
+    eyebrow: 'How it works',
+    title: 'Stake → Win or Lose',
+    body: (
+      <>
+        Pick <span className="up">UP</span> or <span className="down">DOWN</span>. Choose how
+        far the price needs to move and the time window (30s to 1h). Stake any amount you like.
+        We show your <strong>risk → win</strong> live before you confirm.
+      </>
+    ),
+  },
+  {
+    eyebrow: 'Anytime exit',
+    title: 'Sell back before expiry',
+    body: (
+      <>
+        Every ticket has a live <strong>Sell back</strong> price. Lock in a profit early or cut
+        a loss — you don't have to wait for expiry.
+      </>
+    ),
+  },
+];
+
+export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onClose, onDontShowAgain }) => {
+  const [step, setStep] = useState(0);
   if (!isOpen) return null;
 
-  const handleClose = () => {
-    if (dontShowAgain) {
+  const last = step === STEPS.length - 1;
+  const cur = STEPS[step]!;
+
+  const handleNext = () => {
+    if (last) {
       onDontShowAgain();
-    } else {
       onClose();
+    } else {
+      setStep(step + 1);
     }
   };
 
   return (
-    <ModalOverlay onClick={onClose}>
-      <ModalContainer onClick={(e) => e.stopPropagation()}>
-        <ModalHeader>
-          <ModalTitle>🚀 How to Trade</ModalTitle>
-          <CloseButton onClick={onClose}>×</CloseButton>
-        </ModalHeader>
-
-        <ModalContent>
-          <InstructionsList>
-            <InstructionItem>
-              <strong>Choose Call</strong> if you think Bitcoin price will go up, or <strong>Put</strong> if you think it will go down
-            </InstructionItem>
-            <InstructionItem>
-              <strong>Select strike price</strong> - how far from current price you think it will move ($2.50, $5.00, $10.00, or $15.00)
-            </InstructionItem>
-            <InstructionItem>
-              <strong>Pick expiry time</strong> - how long your prediction has to be right (5s, 10s, or 15s)
-            </InstructionItem>
-            <InstructionItem>
-              <strong>Enter contract amount</strong> - each contract costs $1 USD
-            </InstructionItem>
-            <InstructionItem>
-              <strong>Start trade</strong> - your prediction is locked in and will settle automatically at expiry
-            </InstructionItem>
-          </InstructionsList>
-
-          <CheckboxContainer>
-            <Checkbox
-              type="checkbox"
-              id="dont-show-again"
-              checked={dontShowAgain}
-              onChange={(e) => setDontShowAgain(e.target.checked)}
-            />
-            <label htmlFor="dont-show-again">Don't show this again</label>
-          </CheckboxContainer>
-        </ModalContent>
-
-        <ModalFooter>
-          <Button variant="secondary" onClick={onClose}>
-            Close
-          </Button>
-          <Button variant="primary" onClick={handleClose}>
-            Got it!
-          </Button>
-        </ModalFooter>
-      </ModalContainer>
-    </ModalOverlay>
+    <Backdrop onClick={onClose}>
+      <Sheet onClick={e => e.stopPropagation()}>
+        <StepEyebrow>{cur.eyebrow}</StepEyebrow>
+        <Title>{cur.title}</Title>
+        <Body>{cur.body}</Body>
+        <Dots>
+          {STEPS.map((_, i) => <Dot key={i} active={i === step} />)}
+        </Dots>
+        <Actions>
+          <Ghost onClick={() => { onDontShowAgain(); onClose(); }}>Skip</Ghost>
+          <Primary onClick={handleNext}>{last ? 'Try it' : 'Next'}</Primary>
+        </Actions>
+      </Sheet>
+    </Backdrop>
   );
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
