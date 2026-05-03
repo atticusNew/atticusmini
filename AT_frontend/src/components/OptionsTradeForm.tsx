@@ -4,7 +4,6 @@ import { useAuth } from '../contexts/AuthProvider';
 import { useCanister } from '../contexts/CanisterProvider';
 import { useBalance } from '../contexts/BalanceProvider';
 import { Tooltip } from './Tooltip';
-import { bestOddsPredictor, TradeRecommendation } from '../services/BestOddsPredictor';
 
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error) {
@@ -791,12 +790,6 @@ export const OptionsTradeForm: React.FC<OptionsTradeFormProps> = ({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // ✅ BEST ODDS STATE
-  const [showRecommendation, setShowRecommendation] = useState(false);
-  const [currentRecommendation, setCurrentRecommendation] = useState<TradeRecommendation | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  
-  // ✅ NEW: Expandable breakdown state
   const [isBreakdownExpanded, setIsBreakdownExpanded] = useState(false);
 
   useEffect(() => {
@@ -805,21 +798,6 @@ export const OptionsTradeForm: React.FC<OptionsTradeFormProps> = ({
       contracts: '1'
     });
   }, []);
-
-  // ✅ INITIALIZE BACKEND SERVICE FOR BEST ODDS
-  useEffect(() => {
-    if (tradingCanister) {
-      bestOddsPredictor.initializeBackendService(tradingCanister);
-      console.log('✅ Best Odds: Backend service initialized');
-    }
-  }, [tradingCanister]);
-
-  // ✅ UPDATE PRICE DATA FOR BEST ODDS ANALYSIS
-  useEffect(() => {
-    if (currentPrice > 0) {
-      bestOddsPredictor.updatePrice(currentPrice);
-    }
-  }, [currentPrice]);
 
   const expiryOptions = [
     { value: '5s', label: '5s' },
@@ -908,63 +886,6 @@ export const OptionsTradeForm: React.FC<OptionsTradeFormProps> = ({
     }
   };
 
-  // ✅ BEST ODDS HANDLERS (ENHANCED WITH BACKEND STATS)
-  const handleBestOddsClick = async () => {
-    setIsAnalyzing(true);
-    try {
-      const recommendation = await bestOddsPredictor.getBestRecommendation();
-      
-      // ✅ DIAGNOSTIC: Log full recommendation details
-      console.log('✅ Best Odds recommendation:', recommendation);
-      console.log('📊 Sample Size:', recommendation.sampleSize);
-      console.log('📊 Data Source:', recommendation.dataSource);
-      console.log('📊 Breakdown:', recommendation.breakdown);
-      console.log('📊 Market Conditions:', recommendation.marketConditions);
-      
-      setCurrentRecommendation(recommendation);
-      setShowRecommendation(true);
-    } catch (error) {
-      console.error('❌ Best odds analysis failed:', error);
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
-  const handleExecuteRecommendation = async () => {
-    if (!currentRecommendation || !onTradeStart) {
-      return;
-    }
-
-    console.log('🔍 Best Odds: Starting execution with recommendation:', currentRecommendation);
-
-    // ✅ FIX: Pass recommendation data directly to handleTradeStart
-    const overrideParams = {
-      optionType: currentRecommendation.optionType,
-      strikeOffset: currentRecommendation.strikeOffset,
-      expiry: currentRecommendation.expiry
-    };
-    
-    // Close modal
-    setShowRecommendation(false);
-    
-    // Execute trade with 1 contract and override parameters
-    const contractCount = 1;
-    setIsSubmitting(true);
-    try {
-      await onTradeStart(contractCount, overrideParams);
-    } catch (error) {
-      console.error('Recommended trade failed:', error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleCloseRecommendation = () => {
-    setShowRecommendation(false);
-    setCurrentRecommendation(null);
-  };
-
-
   const isFormValid = !!(optionType && strikeOffset > 0 && localFormData.expiry && localFormData.contracts);
   
   // ✅ NEW: Calculate trade validation
@@ -977,7 +898,7 @@ export const OptionsTradeForm: React.FC<OptionsTradeFormProps> = ({
     tradeCostUSD: 0, 
     tradeCostBTC: 0,
     error: undefined 
-  } : validateTradeBalance(contractCount, currentPrice);
+  } : (validateTradeBalance(contractCount, currentPrice) as any);
   
   const canTrade = isFormValid && 
     (isDemoMode || isConnected) && 
@@ -1163,31 +1084,6 @@ export const OptionsTradeForm: React.FC<OptionsTradeFormProps> = ({
         </SummaryBox>
       )}
 
-      {/* ✅ BEST ODDS BUTTON */}
-      <BestOddsButton
-        type="button"
-        onClick={handleBestOddsClick}
-        disabled={isAnalyzing || isSubmitting || isTradeInProgress}
-      >
-        {isAnalyzing ? (
-          <>
-            <div style={{
-              width: '16px',
-              height: '16px',
-              border: '2px solid transparent',
-              borderTop: '2px solid currentColor',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite'
-            }} />
-            Analyzing...
-          </>
-        ) : (
-          <>
-            🧠 Smart Trade
-          </>
-        )}
-      </BestOddsButton>
-
       {/* ✅ NEW: Balance Status Display */}
       {!isDemoMode && userBalance > 0 && tradeValidation && tradeValidation.requiredBalance !== undefined && (
         <BalanceStatus status={getBalanceStatus(typeof tradeValidation.requiredBalance === 'number' ? tradeValidation.requiredBalance : (tradeValidation.requiredBalance as any)?.toNumber?.() || 0, currentPrice).status}>
@@ -1288,246 +1184,6 @@ export const OptionsTradeForm: React.FC<OptionsTradeFormProps> = ({
         )}
       </TradeFormOverlay>
 
-      {/* ✅ BEST ODDS RECOMMENDATION MODAL */}
-      {showRecommendation && currentRecommendation && (
-        <ModalOverlay onClick={handleCloseRecommendation}>
-          <ModalContent onClick={(e) => e.stopPropagation()}>
-            {/* ✅ DIAGNOSTIC: Log what modal receives */}
-            {console.log('🖼️ MODAL RENDERING - currentRecommendation.sampleSize:', currentRecommendation.sampleSize)}
-            {console.log('🖼️ MODAL RENDERING - currentRecommendation.dataSource:', currentRecommendation.dataSource)}
-            
-            <ModalHeader>
-              <ModalTitle>🧠 Smart Trade Recommendation</ModalTitle>
-            </ModalHeader>
-            
-            <WinRateDisplay confidence={currentRecommendation.confidence}>
-              {(currentRecommendation.winRate * 100).toFixed(1)}% Win Rate
-            </WinRateDisplay>
-            
-            <RecommendationDetails>
-              <DetailRow>
-                <DetailLabel>Option Type:</DetailLabel>
-                <DetailValue>{currentRecommendation.optionType.toUpperCase()}</DetailValue>
-              </DetailRow>
-              <DetailRow>
-                <DetailLabel>Expiry:</DetailLabel>
-                <DetailValue>{currentRecommendation.expiry}</DetailValue>
-              </DetailRow>
-              <DetailRow>
-                <DetailLabel>Strike Offset:</DetailLabel>
-                <DetailValue>${currentRecommendation.strikeOffset.toFixed(2)}</DetailValue>
-              </DetailRow>
-              <DetailRow>
-                <DetailLabel>
-                  Confidence:
-                  <Tooltip content="High = 20+ real trades + favorable conditions. Medium = 5-19 trades OR model defaults. Based on data quality and market stability." position="top">
-                    <TooltipIcon>ℹ️</TooltipIcon>
-                  </Tooltip>
-                </DetailLabel>
-                <DetailValue style={{ 
-                  color: currentRecommendation.confidence === 'high' ? '#28a745' : 
-                         currentRecommendation.confidence === 'medium' ? '#ffc107' : '#dc3545'
-                }}>
-                  {currentRecommendation.confidence.toUpperCase()}
-                  {currentRecommendation.confidence === 'high' && ' ✅'}
-                  {currentRecommendation.confidence === 'medium' && ' ⚠️'}
-                </DetailValue>
-              </DetailRow>
-              <DetailRow>
-                <DetailLabel>
-                  Data Sample:
-                  <Tooltip content={
-                    (currentRecommendation.sampleSize || 0) >= 20 
-                      ? "Using actual win rates from these trades"
-                      : (currentRecommendation.sampleSize || 0) >= 5
-                      ? "Using Laplace smoothing on these trades"
-                      : (currentRecommendation.sampleSize || 0) > 0
-                      ? "Trades recorded but using model defaults (need 5+ for real rates)"
-                      : "No trades yet for this combination"
-                  } position="top">
-                    <TooltipIcon>ℹ️</TooltipIcon>
-                  </Tooltip>
-                </DetailLabel>
-                <DetailValue>
-                  {currentRecommendation.sampleSize || 0} trades
-                  {(currentRecommendation.sampleSize || 0) > 0 && (currentRecommendation.sampleSize || 0) < 5 && (
-                    <span style={{ fontSize: '0.75rem', color: '#ffc107', marginLeft: '0.25rem' }}>
-                      (need {5 - (currentRecommendation.sampleSize || 0)} more)
-                    </span>
-                  )}
-                </DetailValue>
-              </DetailRow>
-              
-              {/* ✅ NEW: Data Source Info */}
-              {currentRecommendation.dataSource && (
-                <DetailRow>
-                  <DetailLabel>
-                    Data Source:
-                    <Tooltip content="Real Data (20+ trades) = Uses actual win rates from platform trades. Smoothed Data (5-19 trades) = Real trades with Laplace smoothing. Model Default (<5 trades) = Uses statistical baseline, but real trade count is shown for transparency." position="top">
-                      <TooltipIcon>ℹ️</TooltipIcon>
-                    </Tooltip>
-                  </DetailLabel>
-                  <DetailValue style={{ color: getDataSourceLabel(currentRecommendation.dataSource.type).color }}>
-                    {getDataSourceLabel(currentRecommendation.dataSource.type).icon} {getDataSourceLabel(currentRecommendation.dataSource.type).label}
-                  </DetailValue>
-                </DetailRow>
-              )}
-              
-              {/* ✅ NEW: Last Updated */}
-              {currentRecommendation.dataSource && currentRecommendation.dataSource.lastUpdated > 0 && (
-                <DetailRow>
-                  <DetailLabel>
-                    Stats Updated:
-                    <Tooltip content="Trade statistics are cached for 30 seconds to optimize performance." position="top">
-                      <TooltipIcon>ℹ️</TooltipIcon>
-                    </Tooltip>
-                  </DetailLabel>
-                  <DetailValue>{getTimeSince(currentRecommendation.dataSource.lastUpdated)} ago</DetailValue>
-                </DetailRow>
-              )}
-            </RecommendationDetails>
-            
-            {/* ✅ NEW: Win Rate Breakdown (Expandable) */}
-            {currentRecommendation.breakdown && (
-              <>
-                <ExpandableHeader 
-                  $expanded={isBreakdownExpanded}
-                  onClick={() => setIsBreakdownExpanded(!isBreakdownExpanded)}
-                >
-                  <span style={{ fontWeight: 'bold', color: '#333' }}>📈 Win Rate Calculation</span>
-                </ExpandableHeader>
-                
-                <ExpandableContent $expanded={isBreakdownExpanded}>
-                  <BreakdownSection>
-                    <BreakdownRow>
-                      <span>
-                        Base Win Rate:
-                        <Tooltip content={`From ${currentRecommendation.dataSource?.type === 'real' ? 'real platform trades (20+ trades)' : currentRecommendation.dataSource?.type === 'smoothed' ? 'smoothed trade data (5-19 trades)' : 'statistical model (<5 trades, uses baseline rates)'}`} position="top">
-                          <TooltipIcon>ℹ️</TooltipIcon>
-                        </Tooltip>
-                      </span>
-                      <span>{(currentRecommendation.breakdown.baseRate * 100).toFixed(1)}%</span>
-                    </BreakdownRow>
-                    
-                    {currentRecommendation.breakdown.volatilityAdjustment !== 0 && (
-                      <BreakdownRow>
-                        <span>
-                          Volatility Adjustment:
-                          <Tooltip content="Low volatility = more predictable (+boost). High volatility = less predictable (-penalty)." position="top">
-                            <TooltipIcon>ℹ️</TooltipIcon>
-                          </Tooltip>
-                        </span>
-                        <span style={{ color: currentRecommendation.breakdown.volatilityAdjustment > 0 ? '#28a745' : '#dc3545' }}>
-                          {currentRecommendation.breakdown.volatilityAdjustment > 0 ? '+' : ''}{(currentRecommendation.breakdown.volatilityAdjustment * 100).toFixed(1)}%
-                        </span>
-                      </BreakdownRow>
-                    )}
-                    
-                    {currentRecommendation.breakdown.trendBonus > 0 && (
-                      <BreakdownRow>
-                        <span>
-                          Trend Bonus:
-                          <Tooltip content="Strong market trend detected - increases prediction confidence." position="top">
-                            <TooltipIcon>ℹ️</TooltipIcon>
-                          </Tooltip>
-                        </span>
-                        <span style={{ color: '#28a745' }}>
-                          +{(currentRecommendation.breakdown.trendBonus * 100).toFixed(1)}%
-                        </span>
-                      </BreakdownRow>
-                    )}
-                    
-                    {currentRecommendation.breakdown.defaultPenalty < 0 && (
-                      <BreakdownRow>
-                        <span>
-                          Default Penalty:
-                          <Tooltip content="Using model defaults (no real trades yet)." position="top">
-                            <TooltipIcon>ℹ️</TooltipIcon>
-                          </Tooltip>
-                        </span>
-                        <span style={{ color: '#dc3545' }}>
-                          {(currentRecommendation.breakdown.defaultPenalty * 100).toFixed(1)}%
-                        </span>
-                      </BreakdownRow>
-                    )}
-                    
-                    <BreakdownRow>
-                      <span>Final Win Rate:</span>
-                      <span>{(currentRecommendation.breakdown.cappedRate * 100).toFixed(1)}%</span>
-                    </BreakdownRow>
-                  </BreakdownSection>
-                </ExpandableContent>
-              </>
-            )}
-            
-            {/* ✅ NEW: Market Conditions */}
-            {currentRecommendation.marketConditions && (
-              <MarketConditionsSection>
-                <BreakdownHeader>🌡️ Market Conditions</BreakdownHeader>
-                
-                <ConditionRow>
-                  <ConditionLabel>
-                    Volatility:
-                    <Tooltip content="Current market volatility using EWMA calculation. Low (<0.3%) = Stable, predictable. Medium (0.3-0.6%) = Normal. High (>0.6%) = Unpredictable." position="top">
-                      <TooltipIcon>ℹ️</TooltipIcon>
-                    </Tooltip>
-                  </ConditionLabel>
-                  <ConditionValue style={{ color: getVolatilityLabel(currentRecommendation.marketConditions.volatilityStatus).color }}>
-                    {currentRecommendation.marketConditions.volatility.toFixed(2)}% {getVolatilityLabel(currentRecommendation.marketConditions.volatilityStatus).icon} {getVolatilityLabel(currentRecommendation.marketConditions.volatilityStatus).label}
-                  </ConditionValue>
-                </ConditionRow>
-                
-                <ConditionRow>
-                  <ConditionLabel>
-                    Trend:
-                    <Tooltip content="Detected using weighted moving average of last 15 prices. Shows market momentum direction and strength." position="top">
-                      <TooltipIcon>ℹ️</TooltipIcon>
-                    </Tooltip>
-                  </ConditionLabel>
-                  <ConditionValue style={{ color: getTrendLabel(currentRecommendation.marketConditions.trendDirection).color }}>
-                    {getTrendLabel(currentRecommendation.marketConditions.trendDirection).icon} {getTrendLabel(currentRecommendation.marketConditions.trendDirection).label} ({(currentRecommendation.marketConditions.trendStrength * 100).toFixed(0)}% strength)
-                  </ConditionValue>
-                </ConditionRow>
-              </MarketConditionsSection>
-            )}
-            
-            {/* ✅ NEW: Reasoning Box */}
-            {currentRecommendation.reasoning && (
-              <ReasoningBox>
-                <ReasoningTitle>
-                  Why This Trade?
-                  <Tooltip content="This explains how the recommendation was generated using real data, market trends, and volatility analysis." position="top">
-                    <TooltipIcon>ℹ️</TooltipIcon>
-                  </Tooltip>
-                </ReasoningTitle>
-                <ReasoningText>{currentRecommendation.reasoning}</ReasoningText>
-              </ReasoningBox>
-            )}
-            
-            <div style={{ 
-              fontSize: '0.8rem', 
-              color: '#666', 
-              textAlign: 'center', 
-              margin: '1rem 0',
-              padding: '0.75rem',
-              background: '#f8f9fa',
-              borderRadius: '6px',
-              lineHeight: '1.5'
-            }}>
-              ⚠️ Recommendations use statistical analysis and market trends. Past performance does not guarantee future results. Trade responsibly.
-            </div>
-            
-            <ModalButtons>
-              <ModalButton variant="secondary" onClick={handleCloseRecommendation}>
-                Cancel
-              </ModalButton>
-              <ModalButton variant="primary" onClick={handleExecuteRecommendation}>
-                Trade Now
-              </ModalButton>
-            </ModalButtons>
-          </ModalContent>
-        </ModalOverlay>
-      )}
     </TradeFormContainer>
   );
 };

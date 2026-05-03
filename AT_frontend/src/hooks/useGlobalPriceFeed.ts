@@ -8,6 +8,7 @@ import { pricingEngine, PriceData } from '../services/OffChainPricingEngine';
 export const useGlobalPriceFeed = () => {
   const [priceData, setPriceData] = useState<PriceData>({
     current: 0,
+    price: 0,
     timestamp: Date.now(),
     isValid: false,
     change: { amount: 0, percentage: 0 },
@@ -99,6 +100,7 @@ export const useSynchronizedPrice = () => {
   return {
     priceState: {
       current: priceData.current,
+      price: priceData.price ?? priceData.current,
       timestamp: priceData.timestamp,
       change: priceData.change,
       source: priceData.source,

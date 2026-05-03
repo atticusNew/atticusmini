@@ -5,7 +5,6 @@ import { OptionsTradeForm } from './OptionsTradeForm';
 import { PriceChart } from './PriceChart';
 import { TimerDisplay } from './TimerDisplay';
 import { SimpleTradeHistory } from './SimpleTradeHistory';
-import { WalletConnection } from './WalletConnection';
 import { OnboardingModal } from './OnboardingModal';
 import { ErrorBoundary } from './ErrorBoundary';
 import { useCanister } from '../contexts/CanisterProvider';
@@ -372,6 +371,15 @@ const TelegramButton = styled.button`
   }
 `;
 
+const PartnerCustodyNotice: React.FC = () => (
+  <div style={{ padding: '1.5rem', color: 'var(--text-dim)', lineHeight: 1.6 }}>
+    <h3 style={{ color: 'var(--text)', marginBottom: '0.75rem' }}>Custody</h3>
+    <p>Your balance is held by the partner exchange that distributes this app. Funding,
+      withdrawals, and KYC happen there. Atticus only handles trade entry, pricing,
+      and settlement.</p>
+  </div>
+);
+
 const HelpContent: React.FC = () => {
   const handleTelegramClick = () => {
     // Open Telegram support link
@@ -416,7 +424,7 @@ interface TradeData {
 
 export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode = false, onConnectWallet, shouldOpenHelp, onHelpOpened }) => {
   const { priceState, isConnected: priceConnected } = useSynchronizedPrice();
-  const { isConnected: canisterConnected, atticusService, treasuryService } = useCanister();
+  const { isConnected: canisterConnected, atticusService } = useCanister();
   const { user } = useAuth();
   const { refreshBalance } = useBalance();
   const { showOnboarding, handleClose, handleDontShowAgain } = useOnboarding(isDemoMode);
@@ -543,7 +551,7 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
           positionId,
           result,
           atticusService,
-          user?.principal.toString() // Pass user principal
+          user?.principal // Pass user principal
         );
         console.log('✅ Settlement recorded to backend');
       } catch (error) {
@@ -737,7 +745,7 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
     }
 
     // ✅ CRITICAL: Capture price at the exact moment trade starts for perfect synchronization
-    const tradeStartPrice = priceState.current || priceState.price || 0;
+    const tradeStartPrice = priceState.current || 0;
     console.log('🎯 Trade started at price:', tradeStartPrice);
     if (!tradeStartPrice) {
       throw new Error('Price not available for trade - please refresh and try again');
@@ -780,19 +788,19 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
 
       // ✅ FIXED: 1 contract = 1 USD worth of BTC, not 1 BTC
 
-      const tradeRequest: TradeRequest = {
+      const tradeRequest = {
         optionType: finalOptionType,
-        strikeOffset: finalStrikeOffset, // ✅ FIXED: Use strike offset instead of strike price
-        expiry: finalExpiry,  // ✅ Use final expiry
-        size: contracts  // ✅ FIXED: Pass actual contract count (1, 2, 3, etc.)
+        strikeOffset: finalStrikeOffset,
+        expiry: finalExpiry,
+        size: contracts,
       };
 
       console.log('🕐 Trade request with expiry:', finalExpiry);
 
       console.log('🔍 Debug - Calling pricingEngine.placeTrade with:', {
-        userPrincipal: isDemoMode ? 'demo-user' : user?.principal.toString(),
+        userPrincipal: isDemoMode ? 'demo-user' : user?.principal,
         userObject: user,
-        userPrincipalFromUser: user?.principal?.toString(),
+        userPrincipalFromUser: user?.principal,
         tradeRequest,
         isDemoMode
       });
@@ -803,7 +811,7 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
       
       // ✅ NEW: Use off-chain trade placement (faster, more accurate)
       const tradePromise = pricingEngine.placeTrade(
-        isDemoMode ? 'demo-user' : user!.principal.toString(),
+        isDemoMode ? 'demo-user' : user!.principal,
         finalOptionType,
         finalStrikeOffset,
         finalExpiry,
@@ -825,12 +833,11 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
         throw new Error(result.error || 'Trade execution failed');
       }
 
-      const orderId = result.positionId;
+      const orderId = result.positionId ?? 0;
 
-      // ✅ FIXED: Capture real entry price for accurate off-chain calculations
       const tradeData: TradeData = {
         id: orderId.toString(),
-        positionId: orderId, // ✅ ADDED: Store actual backend position ID
+        positionId: orderId,
         entryPrice: tradeStartPrice || 0, // ✅ FIXED: Prevent undefined crash with fallback
         strikeOffset: finalStrikeOffset, // ✅ FIXED: Use strike offset instead of strike price
         startTime: Date.now(),
@@ -1165,7 +1172,7 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
 
             {activeTab === 'wallet' && (
               <ErrorBoundary fallback={<div>Wallet unavailable</div>}>
-                <WalletConnection />
+                <PartnerCustodyNotice />
               </ErrorBoundary>
             )}
 

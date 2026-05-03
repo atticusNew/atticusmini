@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
-import { Principal } from '@dfinity/principal';
 import { useCanister } from '../contexts/CanisterProvider';
 import { useUnifiedAuth } from '../hooks/useUnifiedAuth';
 import { atticusService } from '../services/AtticusService';
@@ -152,22 +151,12 @@ export const SimpleTradeHistory: React.FC = () => {
       setError(null);
       setLoading(true);
       
-      // ✅ SIMPLE: Extract principal from user
-      const userPrincipal = typeof user === 'string'
-        ? Principal.fromText(user)
-        : user?.principal || Principal.anonymous();
+      const userId = typeof user === 'string' ? user : (user?.principal || 'demo-user');
 
-      console.log('📊 SimpleTradeHistory: Fetching trades for user:', userPrincipal.toString());
-      
-      // ✅ SIMPLE: Get all positions from atticus core canister
       const allPositions = await atticusService.getAllPositions();
-      console.log('📊 SimpleTradeHistory: Total positions:', allPositions.length);
-      
+
       if (allPositions && allPositions.length > 0) {
-        // ✅ SIMPLE: Filter for this user only
-        const userPositions = allPositions.filter((pos: any) => {
-          return pos.user?.toString() === userPrincipal.toString();
-        });
+        const userPositions = allPositions.filter((pos: any) => pos.user === userId);
         
         console.log('📊 SimpleTradeHistory: User positions:', userPositions.length);
         

@@ -4,11 +4,11 @@
  * This eliminates the need for a price oracle canister and provides instant calculations
  */
 
-import { Principal } from '@dfinity/principal';
-import { DemoService } from './DemoService';
+import { mockPartnerExchange } from './MockPartnerExchange';
 
 export interface PriceData {
   current: number;
+  price: number;
   timestamp: number;
   isValid: boolean;
   change: {
@@ -130,6 +130,7 @@ export class OffChainPricingEngine {
 
       const priceData: PriceData = {
         current: currentPrice,
+        price: currentPrice,
         timestamp,
         isValid: true,
         change: priceChange,
@@ -316,89 +317,36 @@ export class OffChainPricingEngine {
     strikeOffset: number,
     expiry: string,
     contractCount: number,
-    backendCanister: any,
-    isDemoMode: boolean = false
+    _backendCanister?: any,
+    _isDemoMode: boolean = false
   ): Promise<{ success: boolean; positionId?: number; error?: string }> {
     try {
-      // Get current price from our own feed
       const currentPrice = this.getCurrentPrice();
       if (currentPrice === 0) {
         throw new Error('Price feed not available');
       }
 
-      // Calculate all pricing off-chain
       const strikePrice = this.calculateStrikePrice(currentPrice, strikeOffset, optionType);
-      const premium = this.calculatePremium(contractCount);
-      const tradeCost = this.calculateTradeCost(contractCount, currentPrice);
 
-      console.log('🎯 Off-chain trade calculation:', {
-        currentPrice,
-        strikePrice,
-        premium,
-        tradeCost,
+      const result = await mockPartnerExchange.placeTrade({
+        userId: userPrincipal,
         optionType,
         strikeOffset,
         expiry,
-        contractCount,
-        isDemoMode
+        contracts: contractCount,
+        entryPriceCents: Math.round(currentPrice * 100),
+        strikePriceCents: Math.round(strikePrice * 100),
       });
 
-      // ✅ DEMO MODE: Use demo service instead of real canister
-      if (isDemoMode) {
-        console.log('🎮 Demo mode: Using demo service for trade placement');
-        const demoService = DemoService.getInstance();
-        
-        const result = await demoService.place_trade_simple(
-          userPrincipal,
-          optionType === 'call' ? 'Call' : 'Put',
-          strikeOffset,
-          expiry,
-          contractCount,
-          Math.round(currentPrice * 100), // Convert to cents
-          Math.round(strikePrice * 100)   // Convert to cents
-        );
-
-        if ('ok' in result) {
-          return {
-            success: true,
-            positionId: Number(result.ok)
-          };
-        } else {
-          return {
-            success: false,
-            error: result.err
-          };
-        }
-      }
-
-      // ✅ LIVE MODE: Use real canister
-      const result = await backendCanister.coreCanister.place_trade_simple(
-        Principal.fromText(userPrincipal),
-        optionType === 'call' ? 'Call' : 'Put',
-        Math.round(strikeOffset), // ✅ FIXED: Convert to integer
-        expiry,
-        Math.round(contractCount), // ✅ FIXED: Convert to integer
-        Math.round(currentPrice * 100), // Convert to cents
-        Math.round(strikePrice * 100)   // Convert to cents
-      );
-
       if ('ok' in result) {
-        return {
-          success: true,
-          positionId: Number(result.ok)
-        };
-      } else {
-        return {
-          success: false,
-          error: result.err
-        };
+        return { success: true, positionId: result.ok };
       }
-
+      return { success: false, error: result.err };
     } catch (error) {
-      console.error('❌ Off-chain trade placement failed:', error);
+      console.error('Off-chain trade placement failed:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
@@ -469,105 +417,21 @@ export class OffChainPricingEngine {
   public async recordSettlement(
     positionId: number,
     settlementResult: SettlementResult,
-    backendCanister: any,
-    userPrincipal?: string
+    _backendCanister?: any,
+    _userPrincipal?: string,
   ): Promise<void> {
-    try {
-      console.log('📝 Recording settlement to backend:', {
-        positionId,
-        settlementResult
-      });
-      
-      // ✅ DEBUG: Check each parameter before sending
-      console.log('🔍 Settlement parameters:', {
-        positionId: positionId, // ✅ FIXED: Show actual value being passed
-        outcome: settlementResult.outcome,
-        outcomeType: typeof settlementResult.outcome,
-        payout: Math.round(settlementResult.payout * 100),
-        profit: Math.round(settlementResult.profit * 100),
-        finalPrice: Math.round(settlementResult.finalPrice * 100)
-      });
-      
-      // ✅ DEBUG: Check for undefined values
-      console.log('🔍 Parameter validation:', {
-        positionIdValid: positionId !== undefined && positionId !== null,
-        outcomeValid: settlementResult.outcome !== undefined && settlementResult.outcome !== null,
-        payoutValid: !isNaN(settlementResult.payout),
-        profitValid: !isNaN(settlementResult.profit),
-        finalPriceValid: !isNaN(settlementResult.finalPrice)
-      });
-      
-      // ✅ FIXED: Use correct canister reference
-      console.log('🔍 About to call canister with exact parameters:', {
-        positionId: positionId,
-        outcome: settlementResult.outcome,
-        payout: Math.round(settlementResult.payout * 100),
-        profit: Math.round(settlementResult.profit * 100),
-        finalPrice: Math.round(settlementResult.finalPrice * 100)
-      });
-      
-      // ✅ TEST: Check if backendCanister has recordSettlement method
-      console.log('🔍 backendCanister type:', typeof backendCanister);
-      console.log('🔍 backendCanister has recordSettlement:', 'recordSettlement' in backendCanister);
-      console.log('🔍 backendCanister recordSettlement type:', typeof backendCanister.recordSettlement);
-      
-      // ✅ FIXED: Ensure outcome is never undefined
-      const outcome = settlementResult.outcome || 'loss';
-      console.log('🔍 Final parameters being sent:', {
-        positionId,
-        outcome,
-        payout: Math.round(settlementResult.payout * 100),
-        profit: Math.max(0, Math.round(settlementResult.profit * 100)),
-        finalPrice: Math.round(settlementResult.finalPrice * 100)
-      });
-      
-      // ✅ FIXED: Convert to numbers for Nat64 compatibility (not BigInt)
-      const payoutCents = Math.round(settlementResult.payout * 100);
-      const profitCents = Math.max(0, Math.round(settlementResult.profit * 100));
-      const finalPriceCents = Math.round(settlementResult.finalPrice * 100);
-      
-      console.log('🔍 Number conversion:', {
-        payoutCents,
-        profitCents,
-        finalPriceCents
-      });
-      
-      // ✅ FIXED: Use the actual backend function - recordSettlement
-      // Backend expects: recordSettlement(positionId: nat, outcome: text, payout: nat64, profit: nat64, finalPrice: nat64)
-      console.log('🔍 Using recordSettlement with parameters:', {
-        positionId,
-        outcome,
-        payoutCents,
-        profitCents,
-        finalPriceCents
-      });
-      
-      // ✅ FIXED: Call recordSettlement on the coreCanister
-      const result = await backendCanister.coreCanister.recordSettlement(
-        positionId, // nat
-        outcome, // text
-        payoutCents, // nat64
-        profitCents, // nat64
-        finalPriceCents // nat64
-      );
-      
-      if ('ok' in result) {
-        console.log('✅ Settlement recorded successfully');
-      } else {
-        console.error('❌ Failed to record settlement:', result.err);
-        throw new Error(result.err);
-      }
-    } catch (error) {
-      console.error('❌ Error recording settlement:', error);
-      console.error('❌ Error details:', {
-        message: error.message,
-        stack: error.stack,
-        positionId,
-        settlementResult,
-        backendCanister: typeof backendCanister
-      });
-      throw error;
-    }
+    const outcome = settlementResult.outcome || 'loss';
+    const payoutCents = Math.round(settlementResult.payout * 100);
+    const profitCents = Math.max(0, Math.round(settlementResult.profit * 100));
+    const finalPriceCents = Math.round(settlementResult.finalPrice * 100);
+    const result = await mockPartnerExchange.recordSettlement({
+      positionId,
+      outcome,
+      payoutCents,
+      profitCents,
+      finalPriceCents,
+    });
+    if ('err' in result) throw new Error(result.err);
   }
 
   /**
