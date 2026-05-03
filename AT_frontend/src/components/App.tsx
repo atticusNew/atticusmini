@@ -68,7 +68,6 @@ const AppContent: React.FC = () => {
   return (
     <>
       <GlobalTheme />
-      <DemoBanner />
       <ToastProvider />
       <TradingPanel
         onLogout={async () => { await logout(); }}
