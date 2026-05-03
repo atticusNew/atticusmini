@@ -39,6 +39,12 @@ export interface SellbackQuote {
   premiumUSD: Decimal;
   pnlUSD: Decimal;
   secondsRemaining: number;
+  /**
+   * Seconds until the sell-back lockout window starts. Negative once
+   * the ticket is inside the lockout (sell-back already disabled).
+   * Always 0 for legacy / non-supported tenors.
+   */
+  secondsUntilLockout: number;
   asOf: number;
 }
 
@@ -64,6 +70,7 @@ export class EarlyExitService {
         premiumUSD: ticket.premiumUSD,
         pnlUSD: new Decimal(0),
         secondsRemaining: 0,
+        secondsUntilLockout: 0,
         asOf: nowMs,
       };
     }
@@ -77,11 +84,13 @@ export class EarlyExitService {
         premiumUSD: ticket.premiumUSD,
         pnlUSD: new Decimal(0).minus(ticket.premiumUSD),
         secondsRemaining,
+        secondsUntilLockout: 0,
         asOf: nowMs,
       };
     }
 
     const lockout = LOCKOUT_SECONDS_BY_TENOR[tenor];
+    const secondsUntilLockout = secondsRemaining - lockout;
     if (secondsRemaining <= lockout) {
       return {
         ticketId: ticket.id,
@@ -91,6 +100,7 @@ export class EarlyExitService {
         premiumUSD: ticket.premiumUSD,
         pnlUSD: new Decimal(0),
         secondsRemaining,
+        secondsUntilLockout,
         asOf: nowMs,
       };
     }
@@ -111,6 +121,7 @@ export class EarlyExitService {
       premiumUSD: ticket.premiumUSD,
       pnlUSD: refund.minus(ticket.premiumUSD),
       secondsRemaining,
+      secondsUntilLockout,
       asOf: nowMs,
     };
   }

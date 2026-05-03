@@ -10,10 +10,26 @@ import React, {
 import { Decimal } from 'decimal.js';
 import { useAuth } from './AuthProvider';
 import { useCanister } from './CanisterProvider';
+import { mockPartnerExchangeAdapter } from '../services/partner/MockPartnerExchangeAdapter';
+import {
+  initialBalanceState,
+  nextBalanceState,
+  resetBalanceState,
+  type BalanceSessionState,
+} from './balanceState';
+
+export interface BalanceDelta {
+  amount: number;
+  at: number;
+}
 
 interface BalanceContextType {
   refreshBalance: () => Promise<void>;
+  resetPaperBalance: () => Promise<void>;
   userBalance: number;
+  sessionStartBalance: number;
+  dayPnl: number;
+  lastDelta: BalanceDelta | null;
   isLoading: boolean;
   error: string | null;
   validateTradeBalance: (
@@ -37,7 +53,7 @@ export const useBalance = () => {
 };
 
 export const BalanceProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [userBalance, setUserBalance] = useState<number>(0);
+  const [session, setSession] = useState<BalanceSessionState>(initialBalanceState);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,23 +61,39 @@ export const BalanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const { atticusService, isConnected } = useCanister();
 
   const refreshBalance = useCallback(async () => {
-    if (!user || !isConnected) return;
+    if (!user) return;
     setIsLoading(true);
     setError(null);
     try {
       const data = await atticusService.getUser(user.principal);
-      setUserBalance(data?.balance ?? 0);
+      const next = data?.balance ?? 0;
+      setSession(prev => nextBalanceState(prev, next));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
-      setUserBalance(0);
+      setSession(prev => nextBalanceState(prev, 0));
     } finally {
       setIsLoading(false);
     }
-  }, [user, atticusService, isConnected]);
+  }, [user, atticusService]);
+
+  /**
+   * Wipe the demo paper book back to its starting balance. Only meaningful for
+   * the mock partner adapter; on a live partner it's a no-op.
+   */
+  const resetPaperBalance = useCallback(async () => {
+    mockPartnerExchangeAdapter.reset();
+    setSession(resetBalanceState());
+    await refreshBalance();
+  }, [refreshBalance]);
 
   useEffect(() => {
     if (user && isConnected) refreshBalance().catch(() => {});
   }, [user, isConnected, refreshBalance]);
+
+  const userBalance = session.current;
+  const sessionStartBalance = session.sessionStart;
+  const dayPnl = session.dayPnl;
+  const lastDelta = session.lastDelta;
 
   const validateTradeBalance = useCallback(
     (contractCount: number, btcPrice: number) => {
@@ -105,7 +137,11 @@ export const BalanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const value = useMemo(
     () => ({
       refreshBalance,
+      resetPaperBalance,
       userBalance,
+      sessionStartBalance,
+      dayPnl,
+      lastDelta,
       isLoading,
       error,
       validateTradeBalance,
@@ -115,7 +151,11 @@ export const BalanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     }),
     [
       refreshBalance,
+      resetPaperBalance,
       userBalance,
+      sessionStartBalance,
+      dayPnl,
+      lastDelta,
       isLoading,
       error,
       validateTradeBalance,
