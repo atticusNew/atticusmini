@@ -220,12 +220,17 @@ export const TradeForm: React.FC<TradeFormProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
 
+  // No default direction: novice must explicitly pick UP or DOWN before
+  // anything else lights up. `direction` is only used for tone/strike
+  // chip math when `optionType` is set; otherwise the rest of the form
+  // is gated by `directionPicked` below.
   const direction = optionType ?? 'call';
+  const directionPicked = optionType != null;
   const tone: 'up' | 'down' = direction === 'call' ? 'up' : 'down';
 
   const tenorReady = !!tenor;
   const ready =
-    !!optionType &&
+    directionPicked &&
     strikeOffset > 0 &&
     tenorReady &&
     stake >= STAKE_MIN &&
@@ -297,7 +302,7 @@ export const TradeForm: React.FC<TradeFormProps> = ({
           <DirectionButton
             type="button"
             tone="up"
-            active={direction === 'call'}
+            active={optionType === 'call'}
             disabled={isTradeActive || isTradeInProgress}
             onClick={() => handleDirection('call')}
           >
@@ -306,7 +311,7 @@ export const TradeForm: React.FC<TradeFormProps> = ({
           <DirectionButton
             type="button"
             tone="down"
-            active={direction === 'put'}
+            active={optionType === 'put'}
             disabled={isTradeActive || isTradeInProgress}
             onClick={() => handleDirection('put')}
           >
@@ -343,7 +348,7 @@ export const TradeForm: React.FC<TradeFormProps> = ({
                 <StrikeChipInner>
                   <span className="offset">{sign}${offset}</span>
                   <span className="meta">
-                    {probPct != null ? `${probPct}% likely · ${mult!.toFixed(2)}×` : 'pick direction'}
+                    {probPct != null ? `${probPct}% likely · ${mult!.toFixed(2)}×` : 'pick UP or DOWN first'}
                   </span>
                 </StrikeChipInner>
               </StrikeChip>
@@ -431,9 +436,9 @@ export const TradeForm: React.FC<TradeFormProps> = ({
             : isTradeActive
               ? 'Trade in progress'
               : !optionType
-                ? 'Pick direction'
+                ? 'Pick UP or DOWN to start'
                 : !strikeOffset
-                  ? 'Pick strike'
+                  ? 'Pick a target price'
                   : `Review · $${stake}`}
         </Cta>
       </Stack>
