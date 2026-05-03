@@ -7,6 +7,8 @@
 import { Decimal } from 'decimal.js';
 import { getPartnerExchange } from './partner';
 import { realizedVolatility } from './pricing/realizedVolatility';
+import { pricingService, type Tenor } from './pricing/PricingService';
+import { isSupportedTenor } from './pricing/tenor';
 
 export interface PriceData {
   current: number;
@@ -231,9 +233,14 @@ export class OffChainPricingEngine {
   }
 
   /**
-   * ✅ CALCULATE SETTLEMENT (OFF-CHAIN)
-   * Fast, accurate settlement using proper payout tables
-   * This replaces the slow backend settlement with instant off-chain calculation
+   * Settle a binary ticket at expiry.
+   *
+   * Single source of truth for payout: the multiple is taken from the same
+   * `PricingService.quote()` the user saw at trade time (frozen via
+   * `quotedPayoutMultiple`). If a quoted multiple is not provided we re-quote
+   * with the trade's frozen entry price + tenor so the user is paid exactly
+   * what the chip showed at submit. The deprecated 5s/10s/15s `PAYOUT_TABLE`
+   * is gone — every supported tenor (30s..1h) now settles correctly.
    */
   public calculateSettlement(
     optionType: 'call' | 'put',
@@ -241,69 +248,88 @@ export class OffChainPricingEngine {
     expiry: string,
     finalPrice: number,
     entryPrice: number,
-    contractCount: number = 1
+    contractCount: number = 1,
+    quotedPayoutMultiple?: number,
   ): SettlementResult {
-    // ✅ FIXED: Calculate strike price from REAL entry price and offset
-    const strikePrice = optionType === 'call' 
-      ? entryPrice + strikeOffset 
+    const strikePrice = optionType === 'call'
+      ? entryPrice + strikeOffset
       : entryPrice - strikeOffset;
-    
-    // ✅ FIXED: Determine win/loss using correct strike price
-    const isWin = optionType === 'call' 
-      ? finalPrice > strikePrice 
-      : finalPrice < strikePrice;
-    
-    const isTie = Math.abs(finalPrice - strikePrice) < 0.005; // 0.5 cent tolerance
-    
-    let outcome: 'win' | 'loss' | 'tie' = 'loss';
-    let payout = 0;
-    let profit = -1.0; // Default to losing the $1 entry premium
-    
+
+    const isTie = Math.abs(finalPrice - strikePrice) < 0.005;
+    const isWin = !isTie && (
+      optionType === 'call' ? finalPrice > strikePrice : finalPrice < strikePrice
+    );
+
+    const premiumPaid = this.calculatePremium(contractCount);
+
     if (isTie) {
-      outcome = 'tie';
-      payout = 1.0 * contractCount; // ✅ FIXED: Refund entry cost for all contracts
-      profit = 0.0; // No profit/loss
-    } else if (isWin) {
-      outcome = 'win';
-      
-      // ✅ USE CORRECT PAYOUT TABLES (matching backend)
-      const PAYOUT_TABLE: Record<string, Record<number, number>> = {
-        '5s': { 2.5: 3.33, 5: 4.00, 10: 10.00, 15: 20.00 },
-        '10s': { 2.5: 2.86, 5: 3.33, 10: 6.67, 15: 13.33 },
-        '15s': { 2.5: 2.50, 5: 2.86, 10: 5.00, 15: 10.00 }
+      return {
+        outcome: 'tie',
+        payout: premiumPaid,
+        profit: 0,
+        finalPrice,
+        strikePrice,
       };
-      
-      // Get payout from table (per contract)
-      const tablePayoutPerContract = PAYOUT_TABLE[expiry]?.[strikeOffset] || 0;
-      payout = tablePayoutPerContract * contractCount; // ✅ FIXED: Multiply by contract count
-      profit = payout - (1.0 * contractCount); // ✅ FIXED: Net profit = total payout - total entry cost
-    } else {
-      outcome = 'loss';
-      payout = 0;
-      profit = -1.0 * contractCount; // ✅ FIXED: Lose the entry premium for all contracts
     }
-    
-    console.log('🎯 Off-chain settlement calculation:', {
+
+    if (!isWin) {
+      return {
+        outcome: 'loss',
+        payout: 0,
+        profit: -premiumPaid,
+        finalPrice,
+        strikePrice,
+      };
+    }
+
+    const multiple = this.resolvePayoutMultiple({
       optionType,
       strikeOffset,
       expiry,
       entryPrice,
-      strikePrice,
-      finalPrice,
-      isWin,
-      isTie,
-      outcome,
-      payout,
-      profit
+      contractCount,
+      quotedPayoutMultiple,
     });
-    
+    const payout = premiumPaid * multiple;
     return {
-      outcome,
+      outcome: 'win',
       payout,
-      profit,
+      profit: payout - premiumPaid,
       finalPrice,
-      strikePrice
+      strikePrice,
     };
+  }
+
+  /**
+   * Resolve a payout multiple for a winning ticket.
+   *
+   * Order of precedence:
+   *  1. The frozen multiple from when the user submitted (preferred — matches UI exactly).
+   *  2. A fresh quote from `PricingService` keyed off the trade's entry price + tenor.
+   *  3. A floor of 1.05x as a defensive fallback if the tenor is unrecognized.
+   */
+  private resolvePayoutMultiple(args: {
+    optionType: 'call' | 'put';
+    strikeOffset: number;
+    expiry: string;
+    entryPrice: number;
+    contractCount: number;
+    quotedPayoutMultiple?: number;
+  }): number {
+    if (args.quotedPayoutMultiple && args.quotedPayoutMultiple > 0) {
+      return args.quotedPayoutMultiple;
+    }
+    if (isSupportedTenor(args.expiry)) {
+      const q = pricingService.quote({
+        optionType: args.optionType,
+        spotUSD: args.entryPrice,
+        strikeOffsetUSD: args.strikeOffset,
+        tenor: args.expiry as Tenor,
+        contracts: args.contractCount,
+      });
+      return q.payoutMultiple;
+    }
+    return 1.05;
   }
 
   /**
@@ -318,8 +344,14 @@ export class OffChainPricingEngine {
     expiry: string,
     contractCount: number,
     _backendCanister?: any,
-    _isDemoMode: boolean = false
-  ): Promise<{ success: boolean; positionId?: number; error?: string }> {
+    _isDemoMode: boolean = false,
+  ): Promise<{
+    success: boolean;
+    positionId?: number;
+    quotedPayoutMultiple?: number;
+    entryPrice?: number;
+    error?: string;
+  }> {
     try {
       const currentPrice = this.getCurrentPrice();
       if (currentPrice === 0) {
@@ -327,6 +359,18 @@ export class OffChainPricingEngine {
       }
 
       const strikePrice = this.calculateStrikePrice(currentPrice, strikeOffset, optionType);
+
+      let quotedPayoutMultiple: number | undefined;
+      if (isSupportedTenor(expiry)) {
+        quotedPayoutMultiple = pricingService.quote({
+          optionType,
+          spotUSD: currentPrice,
+          strikeOffsetUSD: strikeOffset,
+          tenor: expiry as Tenor,
+          contracts: contractCount,
+        }).payoutMultiple;
+      }
+
       const partner = getPartnerExchange();
       this.placeSequence += 1;
       const result = await partner.placeTicket({
@@ -342,7 +386,12 @@ export class OffChainPricingEngine {
       });
 
       if ('ok' in result) {
-        return { success: true, positionId: result.ok.id };
+        return {
+          success: true,
+          positionId: result.ok.id,
+          quotedPayoutMultiple,
+          entryPrice: currentPrice,
+        };
       }
       return { success: false, error: result.err };
     } catch (error) {
