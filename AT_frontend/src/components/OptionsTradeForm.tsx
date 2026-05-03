@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthProvider';
 import { useCanister } from '../contexts/CanisterProvider';
 import { useBalance } from '../contexts/BalanceProvider';
 import { Tooltip } from './Tooltip';
+import { pricingService, Tenor, TENOR_TO_SECONDS } from '../services/pricing/PricingService';
 
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error) {
@@ -800,19 +801,14 @@ export const OptionsTradeForm: React.FC<OptionsTradeFormProps> = ({
   }, []);
 
   const expiryOptions = [
-    { value: '5s', label: '5s' },
-    { value: '10s', label: '10s' },
-    { value: '15s', label: '15s' }
+    { value: '30s', label: '30s' },
+    { value: '1m', label: '1m' },
+    { value: '5m', label: '5m' },
+    { value: '15m', label: '15m' },
+    { value: '1h', label: '1h' },
   ];
 
-  const strikeOffsets = [2.50, 5.00, 10.00, 15.00];
-
-  // ✅ BACKEND PAYOUT TABLES - Updated for new strike ranges
-  const PROFIT_TABLE = {
-    '5s': { 2.5: 3.33, 5: 4.00, 10: 10.00, 15: 20.00 },
-    '10s': { 2.5: 2.86, 5: 3.33, 10: 6.67, 15: 13.33 },
-    '15s': { 2.5: 2.50, 5: 2.86, 10: 5.00, 15: 10.00 }
-  };
+  const strikeOffsets = [5.00, 10.00, 25.00, 50.00, 100.00];
 
   // BONUS_TABLE removed - no longer needed since net gain line was removed
 
@@ -1072,12 +1068,27 @@ export const OptionsTradeForm: React.FC<OptionsTradeFormProps> = ({
             </span>
           </SummaryRow>
           <SummaryRow>
-            <span>Total Return:</span>
+            <span>Win Payout:</span>
             <span style={{ color: '#00aa33' }}>
-              {optionType && strikeOffset > 0 && localFormData.expiry ? 
-                `$${formatNumberCSV((PROFIT_TABLE[localFormData.expiry as keyof typeof PROFIT_TABLE]?.[strikeOffset as keyof typeof PROFIT_TABLE['5s']] || 0) * parseFloat(localFormData.contracts || '1'))}` 
-                : '-'
-              }
+              {optionType && strikeOffset > 0 && localFormData.expiry && currentPrice > 0
+                ? `$${formatNumberCSV(
+                    pricingService.quote({
+                      optionType,
+                      spotUSD: currentPrice,
+                      strikeOffsetUSD: strikeOffset,
+                      tenor: localFormData.expiry as Tenor,
+                      contracts: parseFloat(localFormData.contracts || '1') || 1,
+                    }).potentialPayoutUSD.toNumber(),
+                  )}`
+                : '-'}
+            </span>
+          </SummaryRow>
+          <SummaryRow>
+            <span>Tenor length:</span>
+            <span>
+              {localFormData.expiry
+                ? `${TENOR_TO_SECONDS[localFormData.expiry as Tenor]}s`
+                : '-'}
             </span>
           </SummaryRow>
           {/* Net Gain line removed as requested */}
