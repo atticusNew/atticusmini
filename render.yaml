@@ -2,7 +2,7 @@ services:
   - type: web
     name: atticusmini
     runtime: static
-    buildCommand: cd AT_frontend && npm install --no-audit --no-fund && npm run build
+    buildCommand: npm install && npm run build
     staticPublishPath: ./AT_frontend/dist
     pullRequestPreviewsEnabled: false
     routes:
