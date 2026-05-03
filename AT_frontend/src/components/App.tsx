@@ -1,5 +1,5 @@
 import React from 'react';
-import styled, { createGlobalStyle } from 'styled-components';
+import styled from 'styled-components';
 import { TradingPanel } from './TradingPanel';
 import { useAuth, AuthProvider } from '../contexts/AuthProvider';
 import { TradeProvider } from '../contexts/TradeContext';
@@ -8,34 +8,7 @@ import { BalanceProvider } from '../contexts/BalanceProvider';
 import { ToastProvider } from './ToastProvider';
 import { DemoBanner } from './DemoBanner';
 import { AdminPage } from './admin/AdminPage';
-
-const GlobalStyle = createGlobalStyle`
-  :root {
-    --bg-primary: #0f1419;
-    --bg-panel: #1a2332;
-    --accent: #f4d03f;
-    --green: #00d4aa;
-    --red: #ff4757;
-    --text: #ffffff;
-    --text-dim: #8b95a1;
-    --border: #2a3441;
-    --shadow: rgba(0, 0, 0, 0.3);
-    --bg-button: #2a3441;
-    --bg-button-hover: #3a4451;
-  }
-
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
-  body {
-    font-family: 'Inter', sans-serif;
-    background: var(--bg-primary);
-    color: var(--text);
-    overflow-x: hidden;
-    overflow-y: auto;
-  }
-
-  #root { min-height: 100vh; width: 100vw; }
-`;
+import { GlobalTheme } from '../ui/GlobalTheme';
 
 const LoadingContainer = styled.div`
   display: flex;
@@ -43,28 +16,22 @@ const LoadingContainer = styled.div`
   align-items: center;
   justify-content: center;
   height: 100vh;
-  background: var(--bg-primary);
   padding: 2rem;
 `;
 
 const LoadingSpinner = styled.div`
-  width: 40px;
-  height: 40px;
-  border: 3px solid transparent;
-  border-top: 3px solid var(--accent);
+  width: 36px;
+  height: 36px;
+  border: 2px solid transparent;
+  border-top: 2px solid var(--accent);
   border-radius: 50%;
-  animation: spin 1s linear infinite;
+  animation: spin 0.8s linear infinite;
   margin-bottom: 1rem;
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
 `;
 
 const LoadingText = styled.p`
   color: var(--text-dim);
-  font-size: 1rem;
-  text-align: center;
+  font-size: 14px;
 `;
 
 const isAdminRoute = (): boolean => {
@@ -78,7 +45,7 @@ const AppContent: React.FC = () => {
   if (isAdminRoute()) {
     return (
       <>
-        <GlobalStyle />
+        <GlobalTheme />
         <DemoBanner />
         <AdminPage />
       </>
@@ -88,11 +55,11 @@ const AppContent: React.FC = () => {
   if (isLoading) {
     return (
       <>
-        <GlobalStyle />
+        <GlobalTheme />
         <DemoBanner />
         <LoadingContainer>
           <LoadingSpinner />
-          <LoadingText>Loading Atticus...</LoadingText>
+          <LoadingText>Loading Atticus…</LoadingText>
         </LoadingContainer>
       </>
     );
@@ -100,7 +67,7 @@ const AppContent: React.FC = () => {
 
   return (
     <>
-      <GlobalStyle />
+      <GlobalTheme />
       <DemoBanner />
       <ToastProvider />
       <TradingPanel
