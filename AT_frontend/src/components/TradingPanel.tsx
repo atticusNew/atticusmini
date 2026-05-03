@@ -7,6 +7,7 @@ import { SellbackBar } from './SellbackBar';
 import { CountdownPill } from './CountdownPill';
 import { DemoPill } from './DemoPill';
 import { PositionsList } from './PositionsList';
+import { AccountScreen } from './AccountScreen';
 import { OnboardingModal } from './OnboardingModal';
 import { ErrorBoundary } from './ErrorBoundary';
 import { useCanister } from '../contexts/CanisterProvider';
@@ -306,105 +307,6 @@ const MobileTab = styled.button<{ active: boolean; disabled?: boolean }>`
   }
 `;
 
-// Help Content Component
-const HelpContainer = styled.div`
-  padding: 1.5rem;
-  color: var(--text);
-`;
-
-const HelpTitle = styled.h3`
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--accent);
-  margin-bottom: 1rem;
-  text-align: center;
-`;
-
-const HelpList = styled.ul`
-  list-style: none;
-  padding: 0;
-  margin: 0 0 1.5rem 0;
-`;
-
-const HelpItem = styled.li`
-  padding: 0.75rem 0;
-  border-bottom: 1px solid var(--border);
-  font-size: 0.9rem;
-  line-height: 1.5;
-  color: var(--text);
-
-  &:last-child {
-    border-bottom: none;
-  }
-
-  &::before {
-    content: '•';
-    color: var(--accent);
-    font-weight: bold;
-    margin-right: 0.5rem;
-  }
-`;
-
-const TelegramButton = styled.button`
-  width: 100%;
-  padding: 1rem;
-  background: linear-gradient(135deg, #0088cc, #006699);
-  border: none;
-  border-radius: 8px;
-  color: white;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  margin-top: 1rem;
-
-  &:hover {
-    background: linear-gradient(135deg, #006699, #004466);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 136, 204, 0.3);
-  }
-
-  &:active {
-    transform: translateY(0);
-  }
-`;
-
-const PartnerCustodyNotice: React.FC = () => (
-  <div style={{ padding: '1.5rem', color: 'var(--text-dim)', lineHeight: 1.6 }}>
-    <h3 style={{ color: 'var(--text)', marginBottom: '0.75rem' }}>Custody</h3>
-    <p>Your balance is held by the partner exchange that distributes this app. Funding,
-      withdrawals, and KYC happen there. Atticus only handles trade entry, pricing,
-      and settlement.</p>
-  </div>
-);
-
-const HelpContent: React.FC = () => {
-  const handleTelegramClick = () => {
-    // Open Telegram support link
-    window.open('https://t.me/+xGLyFQ1-J1ljNDUx', '_blank');
-  };
-
-  return (
-    <HelpContainer>
-      <HelpTitle>How to Trade</HelpTitle>
-      <HelpList>
-        <HelpItem>Choose Call if you think price will go up</HelpItem>
-        <HelpItem>Choose Put if you think price will go down</HelpItem>
-        <HelpItem>Select strike price and expiry time</HelpItem>
-        <HelpItem>Each contract costs $1 USD</HelpItem>
-        <HelpItem>Trades settle automatically at expiry</HelpItem>
-      </HelpList>
-      <TelegramButton onClick={handleTelegramClick}>
-        📱 Contact Support on Telegram
-      </TelegramButton>
-    </HelpContainer>
-  );
-};
-
 interface TradingPanelProps {
   onLogout?: () => void;
   isDemoMode?: boolean;
@@ -431,7 +333,7 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
   const { refreshBalance } = useBalance();
   const { showOnboarding, handleClose, handleDontShowAgain } = useOnboarding(isDemoMode);
 
-  const [activeTab, setActiveTab] = useState<'trade' | 'positions' | 'wallet' | 'help'>('trade');
+  const [activeTab, setActiveTab] = useState<'trade' | 'positions' | 'account'>('trade');
   const [optionType, setOptionType] = useState<'call' | 'put' | null>(null);
   const [strikeOffset, setStrikeOffset] = useState(0);
   const [selectedExpiry, setSelectedExpiry] = useState('5s');
@@ -490,7 +392,6 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
   // Handle opening help tab from popup
   useEffect(() => {
     if (shouldOpenHelp) {
-      setActiveTab('help');
       onHelpOpened?.();
     }
   }, [shouldOpenHelp, onHelpOpened]);
@@ -1118,29 +1019,14 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
 
         <TradingSidebar>
           <TabContainer>
-            <Tab
-              active={activeTab === 'trade'}
-              onClick={() => setActiveTab('trade')}
-            >
+            <Tab active={activeTab === 'trade'} onClick={() => setActiveTab('trade')}>
               Trade
             </Tab>
-            <Tab
-              active={activeTab === 'positions'}
-              onClick={() => setActiveTab('positions')}
-            >
-              History
+            <Tab active={activeTab === 'positions'} onClick={() => setActiveTab('positions')}>
+              Positions
             </Tab>
-            <Tab
-              active={activeTab === 'wallet'}
-              onClick={() => setActiveTab('wallet')}
-            >
-              Wallet
-            </Tab>
-            <Tab
-              active={activeTab === 'help'}
-              onClick={() => setActiveTab('help')}
-            >
-              Help
+            <Tab active={activeTab === 'account'} onClick={() => setActiveTab('account')}>
+              Account
             </Tab>
           </TabContainer>
 
@@ -1172,15 +1058,21 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
               </ErrorBoundary>
             )}
 
-            {activeTab === 'wallet' && (
-              <ErrorBoundary fallback={<div>Wallet unavailable</div>}>
-                <PartnerCustodyNotice />
-              </ErrorBoundary>
-            )}
-
-            {activeTab === 'help' && (
-              <ErrorBoundary fallback={<div>Help unavailable</div>}>
-                <HelpContent />
+            {activeTab === 'account' && (
+              <ErrorBoundary fallback={<div>Account unavailable</div>}>
+                <AccountScreen
+                  onLogout={onLogout ?? (() => {})}
+                  onReset={() => {
+                    setTradeState(prev => ({
+                      ...prev,
+                      isActive: false,
+                      isInProgress: false,
+                      data: null,
+                      result: null,
+                    }));
+                    refreshBalance().catch(() => {});
+                  }}
+                />
               </ErrorBoundary>
             )}
           </TabContent>
@@ -1198,39 +1090,17 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
           </svg>
           <span>Trade</span>
         </MobileTab>
-        <MobileTab
-          active={activeTab === 'positions'}
-          disabled={isDemoMode}
-          onClick={() => !isDemoMode && setActiveTab('positions')}
-        >
+        <MobileTab active={activeTab === 'positions'} onClick={() => setActiveTab('positions')}>
           <svg viewBox="0 0 24 24" fill="currentColor">
             <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
           </svg>
-          <span>History</span>
+          <span>Positions</span>
         </MobileTab>
-        <MobileTab
-          active={activeTab === 'wallet'}
-          disabled={isDemoMode}
-          onClick={() => {
-            console.log('🔍 Wallet tab clicked:', { isDemoMode, user: !!user });
-            if (!isDemoMode) {
-              setActiveTab('wallet');
-            }
-          }}
-        >
+        <MobileTab active={activeTab === 'account'} onClick={() => setActiveTab('account')}>
           <svg viewBox="0 0 24 24" fill="currentColor">
-            <path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.1 0-2-.9-2-2V5c0-1.1.9-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
+            <path d="M12 12c2.21 0 4-1.79 4-4S14.21 4 12 4 8 5.79 8 8s1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
           </svg>
-          <span>Wallet</span>
-        </MobileTab>
-        <MobileTab
-          active={activeTab === 'help'}
-          onClick={() => setActiveTab('help')}
-        >
-          <svg viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/>
-          </svg>
-          <span>Help</span>
+          <span>Account</span>
         </MobileTab>
       </MobileFooter>
 
