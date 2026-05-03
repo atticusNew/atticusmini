@@ -28,10 +28,10 @@ const Container = styled.div`
   background: var(--bg-elev);
   border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 12px 12px 8px;
+  padding: 10px 10px 6px;
   display: flex;
   flex-direction: column;
-  min-height: 280px;
+  min-height: clamp(220px, 32vh, 320px);
 `;
 
 const Header = styled.div`
@@ -117,30 +117,31 @@ const PriceTag = styled.div<{ tickTone: 'up' | 'down' | 'flat'; flashKey: number
 const ChartArea = styled.div`
   position: relative;
   flex: 1;
-  min-height: 220px;
+  min-height: 200px;
 `;
 
-const Legend = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 6px 4px 0;
-  font-family: var(--font-sans);
-  font-size: 11px;
-  color: var(--text-dim);
-  letter-spacing: 0.04em;
-
-  span.swatch {
-    display: inline-block;
-    width: 10px;
-    height: 2px;
-    margin-right: 6px;
-    vertical-align: middle;
-  }
-  span.entry .swatch { background: var(--text-dim); border-top: 1px dashed var(--text-dim); }
-  span.strike .swatch { background: var(--accent); }
-  span.spot .swatch { background: var(--up); }
+const LineBadge = styled.div<{ tone: 'accent' | 'dim' }>`
+  position: absolute;
+  right: 60px;
+  transform: translateY(-50%);
+  pointer-events: none;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: ${p => (p.tone === 'accent' ? 'rgba(245,195,68,0.16)' : 'rgba(125,138,156,0.18)')};
+  color: ${p => (p.tone === 'accent' ? 'var(--accent)' : 'var(--text-dim)')};
+  border: 1px solid ${p => (p.tone === 'accent' ? 'rgba(245,195,68,0.42)' : 'var(--border)')};
+  white-space: nowrap;
+  z-index: 2;
 `;
+
+
+// Legend removed in v2 — floating line badges (LineBadge) carry the same
+// information directly on the chart, so the bottom legend was duplicate.
 
 const HISTORY_LIMIT = 240;
 
@@ -189,6 +190,22 @@ export const PriceChart: React.FC<PriceChartProps> = ({
   const lastPriceRef = useRef<number>(0);
   const [tickTone, setTickTone] = useState<'up' | 'down' | 'flat'>('flat');
   const [tickKey, setTickKey] = useState(0);
+
+  // Pixel-space measurement for floating line badges. We can't rely on
+  // recharts label `position: 'right'` because it overlaps the Y-axis
+  // tick text (text labels were causing the readability complaint).
+  const chartAreaRef = useRef<HTMLDivElement | null>(null);
+  const [chartH, setChartH] = useState(0);
+  useEffect(() => {
+    const el = chartAreaRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(entries => {
+      for (const e of entries) setChartH(e.contentRect.height);
+    });
+    ro.observe(el);
+    setChartH(el.getBoundingClientRect().height);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     const onTick = (data: PriceData) => {
@@ -262,7 +279,7 @@ export const PriceChart: React.FC<PriceChartProps> = ({
         </PriceTag>
       </Header>
 
-      <ChartArea>
+      <ChartArea ref={chartAreaRef}>
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={history} margin={{ top: 8, right: 56, left: 8, bottom: 0 }}>
             <defs>
@@ -311,16 +328,6 @@ export const PriceChart: React.FC<PriceChartProps> = ({
                 y={entryPrice}
                 stroke="var(--text-dim)"
                 strokeDasharray="4 4"
-                label={{
-                  value: `ENTRY  $${formatPrice(entryPrice!)}`,
-                  position: 'right',
-                  fill: 'var(--text-dim)',
-                  fontSize: 10,
-                  fontWeight: 600,
-                  fontFamily: 'var(--font-mono)',
-                  letterSpacing: '0.08em',
-                  offset: 6,
-                }}
               />
             )}
 
@@ -329,16 +336,6 @@ export const PriceChart: React.FC<PriceChartProps> = ({
                 y={strike}
                 stroke="var(--accent)"
                 strokeWidth={1.5}
-                label={{
-                  value: `STRIKE  $${formatPrice(strike)} · ${optionType === 'call' ? 'wins above' : 'wins below'}`,
-                  position: 'right',
-                  fill: 'var(--accent)',
-                  fontSize: 10,
-                  fontWeight: 700,
-                  fontFamily: 'var(--font-mono)',
-                  letterSpacing: '0.08em',
-                  offset: 6,
-                }}
               />
             )}
 
@@ -354,13 +351,48 @@ export const PriceChart: React.FC<PriceChartProps> = ({
             />
           </AreaChart>
         </ResponsiveContainer>
-      </ChartArea>
+        {chartH > 0 && (() => {
+          // Recharts margin: { top: 8, bottom: 0 } → plot area = chartH - 8.
+          const plotTop = 8;
+          const plotH = Math.max(1, chartH - plotTop);
+          const [yMin, yMax] = yDomain;
+          const yRange = Math.max(1e-9, yMax - yMin);
+          const toPx = (v: number) => plotTop + (1 - (v - yMin) / yRange) * plotH;
 
-      <Legend>
-        <span className="spot"><span className="swatch" /> Live</span>
-        {showEntry && <span className="entry"><span className="swatch" /> Entry</span>}
-        {showStrike && <span className="strike"><span className="swatch" /> Strike ({optionType === 'call' ? 'wins above' : 'wins below'})</span>}
-      </Legend>
+          const items: Array<{
+            key: string; tone: 'accent' | 'dim'; y: number; label: string;
+          }> = [];
+          if (showEntry && entryPrice) {
+            items.push({
+              key: 'entry', tone: 'dim',
+              y: toPx(entryPrice), label: `entry $${formatPrice(entryPrice)}`,
+            });
+          }
+          if (showStrike && strike) {
+            items.push({
+              key: 'strike', tone: 'accent',
+              y: toPx(strike), label: `target $${formatPrice(strike)}`,
+            });
+          }
+          // Anti-collision: if two badges are within 22px, push them apart
+          // around their midpoint so they never overlap.
+          if (items.length === 2) {
+            const [a, b] = items as [typeof items[number], typeof items[number]];
+            const gap = Math.abs(a.y - b.y);
+            if (gap < 22) {
+              const mid = (a.y + b.y) / 2;
+              const sign = a.y <= b.y ? -1 : 1;
+              a.y = mid + sign * 12;
+              b.y = mid - sign * 12;
+            }
+          }
+          return items.map(it => (
+            <LineBadge key={it.key} tone={it.tone} style={{ top: it.y }}>
+              {it.label}
+            </LineBadge>
+          ));
+        })()}
+      </ChartArea>
     </Container>
   );
 };
