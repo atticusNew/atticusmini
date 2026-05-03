@@ -155,3 +155,36 @@ export const Hairline = styled.div`
   height: 1px;
   background: linear-gradient(90deg, transparent, var(--border), transparent);
 `;
+
+/**
+ * v3 form layout primitive: label on the left, control on the right.
+ * Stack vertically with hairline dividers for a settings-like list.
+ */
+export const FormRow = styled.div`
+  display: grid;
+  grid-template-columns: minmax(70px, auto) 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  min-height: 44px;
+
+  & + & {
+    border-top: 1px solid var(--border);
+  }
+`;
+
+export const FormRowLabel = styled.div`
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  letter-spacing: 0.02em;
+`;
+
+export const FormRowControl = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+`;

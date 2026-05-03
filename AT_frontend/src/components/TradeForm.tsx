@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import styled from 'styled-components';
-import { Button, Card, Chip, Label, Stack } from '../ui/primitives';
+import { Button, Chip, FormRow, FormRowLabel, FormRowControl, Stack } from '../ui/primitives';
 import { pricingService, Tenor } from '../services/pricing/PricingService';
 import { useBalance } from '../contexts/BalanceProvider';
 import { useAuth } from '../contexts/AuthProvider';
@@ -26,38 +26,34 @@ export interface TradeFormProps {
 
 /**
  * v3: strike picker is the offset only — `+$5 / +$10 / +$25 / +$50`
- * (signs flip to `−` when PUT is selected). Target price, distance
- * tag, and per-chip multiplier all moved off the chip; the trader
- * sees the trade economics in the Risk → Win line below as they tap.
+ * (signs flip to `−` when PUT is selected). Trade economics live in
+ * the Risk → Win line below, which updates as the trader taps.
  */
 const STRIKE_OFFSETS = [5, 10, 25, 50] as const;
 const TENORS: Tenor[] = ['30s', '1m', '5m', '15m'];
 const STAKE_MIN = 1;
 const STAKE_MAX = 100;
 
-const Container = styled(Card)`
-  padding: 14px;
+/**
+ * v3 container: flat list, no card border. The trading sidebar's own
+ * background carries the surface; per-row hairline dividers handle
+ * grouping.
+ */
+const Container = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  padding: 4px 14px 14px;
 `;
 
-const Section = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-`;
-
-const ChipGrid4 = styled.div`
+/**
+ * 4-up button group used by both Direction (UP/DOWN) and the chip rows
+ * (Strike/Tenor). Equal-width grid keeps the form vertically tidy.
+ */
+const ButtonGroup = styled.div<{ cols: 2 | 4 }>`
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-`;
-
-const DirectionGroup = styled.div`
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  grid-template-columns: repeat(${p => p.cols}, 1fr);
+  gap: 6px;
+  width: 100%;
 `;
 
 const DirectionButton = styled.button<{ active?: boolean; tone: 'up' | 'down' }>`
@@ -65,20 +61,21 @@ const DirectionButton = styled.button<{ active?: boolean; tone: 'up' | 'down' }>
   border: 1.5px solid ${p =>
     p.active ? (p.tone === 'up' ? 'var(--up)' : 'var(--down)') : 'var(--border)'};
   background: ${p =>
-    p.active ? (p.tone === 'up' ? 'var(--up-dim)' : 'var(--down-dim)') : 'var(--bg-elev-2)'};
+    p.active ? (p.tone === 'up' ? 'var(--up-dim)' : 'var(--down-dim)') : 'transparent'};
   color: ${p => (p.active ? (p.tone === 'up' ? 'var(--up)' : 'var(--down)') : 'var(--text)')};
-  border-radius: 14px;
-  padding: 18px 16px;
+  border-radius: 10px;
+  padding: 8px 10px;
   font-family: var(--font-sans);
-  font-weight: 800;
-  font-size: 18px;
-  letter-spacing: 0.06em;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.04em;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   cursor: pointer;
   transition: 120ms ease-out;
+  min-height: 36px;
   &:disabled { opacity: 0.5; cursor: not-allowed; }
   &:hover:not(:disabled) {
     border-color: ${p => (p.tone === 'up' ? 'var(--up)' : 'var(--down)')};
@@ -86,35 +83,27 @@ const DirectionButton = styled.button<{ active?: boolean; tone: 'up' | 'down' }>
 `;
 
 /**
- * v3: chip is just the signed offset (`+$5`, `−$10`). Active state is
- * an accent border + slightly elevated background so the chip reads at
- * a glance without color-coding direction redundantly with the
- * direction buttons above it.
+ * v3 strike chip: signed offset only. Active state is an accent
+ * border. The chip's outer typography (mono, weight 700) renders the
+ * `+$5` / `−$10` text directly — no inner spans needed.
  */
 const StrikeChip = styled.button<{ active?: boolean }>`
   appearance: none;
   border: 1px solid ${p => (p.active ? 'var(--accent)' : 'var(--border)')};
   background: ${p => (p.active ? 'var(--bg-elev-2)' : 'transparent')};
-  border-radius: 10px;
-  padding: 10px 8px;
+  border-radius: 8px;
+  padding: 8px 6px;
   cursor: pointer;
   color: var(--text);
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 13px;
   text-align: center;
-  letter-spacing: 0.02em;
   transition: 120ms ease-out;
+  min-height: 36px;
   &:disabled { opacity: 0.45; cursor: not-allowed; }
   &:hover:not(:disabled) { border-color: var(--border-strong); }
-`;
-
-const StakeRow = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
 `;
 
 const StakeStepper = styled.div`
@@ -151,7 +140,6 @@ const StakeValue = styled.div`
 
 /**
  * v3: Risk → Win is a single centered sentence — no card, no border.
- * The risk number is dim, the win number is the green emphasis.
  * Same data as the v2 panel, half the visual weight.
  */
 const RiskWinLine = styled.div`
@@ -291,78 +279,86 @@ export const TradeForm: React.FC<TradeFormProps> = ({
 
   return (
     <Container>
-      <Section>
-        <DirectionGroup>
-          <DirectionButton
-            type="button"
-            tone="up"
-            active={optionType === 'call'}
-            disabled={isTradeActive || isTradeInProgress}
-            onClick={() => handleDirection('call')}
-            aria-label="Bet that BTC will go up"
-          >
-            ▲ UP
-          </DirectionButton>
-          <DirectionButton
-            type="button"
-            tone="down"
-            active={optionType === 'put'}
-            disabled={isTradeActive || isTradeInProgress}
-            onClick={() => handleDirection('put')}
-            aria-label="Bet that BTC will go down"
-          >
-            ▼ DOWN
-          </DirectionButton>
-        </DirectionGroup>
-      </Section>
-
-      <Section>
-        <Label>By how much</Label>
-        <ChipGrid4>
-          {STRIKE_OFFSETS.map(offset => {
-            const sign = optionType === 'put' ? '−' : '+';
-            return (
-              <StrikeChip
-                type="button"
-                key={offset}
-                active={strikeOffset === offset}
-                disabled={!optionType || isTradeActive || isTradeInProgress}
-                onClick={() => handleStrike(offset)}
-              >
-                {sign}${offset}
-              </StrikeChip>
-            );
-          })}
-        </ChipGrid4>
-      </Section>
-
-      <Section>
-        <ChipGrid4>
-          {TENORS.map(t => (
-            <Chip
+      <FormRow>
+        <FormRowLabel>Up or down?</FormRowLabel>
+        <FormRowControl>
+          <ButtonGroup cols={2}>
+            <DirectionButton
               type="button"
-              key={t}
-              active={tenor === t}
-              tone="accent"
-              onClick={() => handleTenor(t)}
+              tone="up"
+              active={optionType === 'call'}
               disabled={isTradeActive || isTradeInProgress}
+              onClick={() => handleDirection('call')}
+              aria-label="Bet that BTC will go up"
             >
-              {t}
-            </Chip>
-          ))}
-        </ChipGrid4>
-      </Section>
+              ▲ UP
+            </DirectionButton>
+            <DirectionButton
+              type="button"
+              tone="down"
+              active={optionType === 'put'}
+              disabled={isTradeActive || isTradeInProgress}
+              onClick={() => handleDirection('put')}
+              aria-label="Bet that BTC will go down"
+            >
+              ▼ DOWN
+            </DirectionButton>
+          </ButtonGroup>
+        </FormRowControl>
+      </FormRow>
 
-      <Section>
-        <Label>How much</Label>
-        <StakeRow>
+      <FormRow>
+        <FormRowLabel>By how much?</FormRowLabel>
+        <FormRowControl>
+          <ButtonGroup cols={4}>
+            {STRIKE_OFFSETS.map(offset => {
+              const sign = optionType === 'put' ? '−' : '+';
+              return (
+                <StrikeChip
+                  type="button"
+                  key={offset}
+                  active={strikeOffset === offset}
+                  disabled={!optionType || isTradeActive || isTradeInProgress}
+                  onClick={() => handleStrike(offset)}
+                >
+                  {sign}${offset}
+                </StrikeChip>
+              );
+            })}
+          </ButtonGroup>
+        </FormRowControl>
+      </FormRow>
+
+      <FormRow>
+        <FormRowLabel>By when?</FormRowLabel>
+        <FormRowControl>
+          <ButtonGroup cols={4}>
+            {TENORS.map(t => (
+              <Chip
+                type="button"
+                key={t}
+                active={tenor === t}
+                tone="accent"
+                onClick={() => handleTenor(t)}
+                disabled={isTradeActive || isTradeInProgress}
+              >
+                {t}
+              </Chip>
+            ))}
+          </ButtonGroup>
+        </FormRowControl>
+      </FormRow>
+
+      <FormRow>
+        <FormRowLabel>How much?</FormRowLabel>
+        <FormRowControl>
           <StakeStepper>
             <StepperButton onClick={() => setStakeClamped(stake - 1)} disabled={stake <= STAKE_MIN}>−</StepperButton>
             <StakeValue>${stake}</StakeValue>
             <StepperButton onClick={() => setStakeClamped(stake + 1)} disabled={stake >= STAKE_MAX}>+</StepperButton>
           </StakeStepper>
-        </StakeRow>
-      </Section>
+        </FormRowControl>
+      </FormRow>
 
       <Stack gap={10}>
         {live && optionType && (
