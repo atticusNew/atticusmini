@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import styled from 'styled-components';
 import { useSynchronizedPrice } from '../hooks/useGlobalPriceFeed';
-import { OptionsTradeForm } from './OptionsTradeForm';
+import { TradeForm } from './TradeForm';
 import { PriceChart } from './PriceChart';
 import { TimerDisplay } from './TimerDisplay';
 import { SellbackCard } from './SellbackCard';
@@ -1160,7 +1160,7 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
           <TabContent>
             {activeTab === 'trade' && (
               <ErrorBoundary fallback={<div>Trading form unavailable</div>}>
-                <OptionsTradeForm
+                <TradeForm
                   currentPrice={priceState.current}
                   optionType={optionType}
                   strikeOffset={strikeOffset}
@@ -1170,14 +1170,8 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
                   onStrikeOffsetSelect={handleStrikeOffsetSelect}
                   onExpirySelect={handleExpirySelect}
                   onTradeStart={handleTradeStart}
-                  onTradeClose={handleTradeClose}
                   isConnected={isFullyConnected}
-                  activeTrade={tradeState.data}
-                  entryPrice={tradeState.entryPrice}
-                  settlementResult={tradeState.settlementResult}
                   isDemoMode={isDemoMode}
-                  tradeStatusMessage={tradeState.statusMessage}
-                  onConnectWallet={onConnectWallet}
                 />
               </ErrorBoundary>
             )}
