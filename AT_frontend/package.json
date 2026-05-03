@@ -9,7 +9,7 @@
     "preview": "vite preview --port 3000 --host 0.0.0.0",
     "start": "vite preview --port 3000 --host 0.0.0.0",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test src/**/*.test.ts"
+    "test": "bash -c 'shopt -s globstar; tsx --test src/**/*.test.ts'"
   },
   "dependencies": {
     "@types/react": "^18.3.24",
