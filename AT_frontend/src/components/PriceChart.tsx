@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import styled from 'styled-components';
+import styled, { keyframes, css } from 'styled-components';
 import {
   Area,
   AreaChart,
@@ -38,25 +38,80 @@ const Header = styled.div`
   display: flex;
   align-items: baseline;
   justify-content: space-between;
+  gap: 12px;
   padding: 0 4px;
   margin-bottom: 8px;
+`;
+
+const TitleStack = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 `;
 
 const Title = styled.div`
   font-family: var(--font-sans);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-dim);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 `;
 
-const PriceTag = styled.div<{ tone: 'up' | 'down' | 'flat' }>`
+const LiveDot = styled.span<{ live: boolean }>`
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: ${p => (p.live ? 'var(--up)' : 'var(--down)')};
+  box-shadow: 0 0 0 0 ${p => (p.live ? 'rgba(27,196,125,0.55)' : 'rgba(255,93,108,0.55)')};
+  animation: ${p => (p.live ? 'liveDotPulse 1.6s ease-out infinite' : 'none')};
+
+  @keyframes liveDotPulse {
+    0%   { box-shadow: 0 0 0 0 rgba(27,196,125,0.55); }
+    70%  { box-shadow: 0 0 0 6px rgba(27,196,125,0); }
+    100% { box-shadow: 0 0 0 0 rgba(27,196,125,0); }
+  }
+`;
+
+const SubLine = styled.div<{ tone: 'up' | 'down' | 'flat' }>`
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+  font-size: 11px;
   font-weight: 600;
-  font-size: 22px;
-  color: ${p => (p.tone === 'up' ? 'var(--up)' : p.tone === 'down' ? 'var(--down)' : 'var(--text)')};
+  color: ${p => (p.tone === 'up' ? 'var(--up)' : p.tone === 'down' ? 'var(--down)' : 'var(--text-dim)')};
+`;
+
+const tickFlashUp = keyframes`
+  0%   { background: var(--up-dim); color: var(--up); }
+  100% { background: transparent; color: var(--text); }
+`;
+const tickFlashDown = keyframes`
+  0%   { background: var(--down-dim); color: var(--down); }
+  100% { background: transparent; color: var(--text); }
+`;
+
+const PriceTag = styled.div<{ tickTone: 'up' | 'down' | 'flat'; flashKey: number }>`
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 24px;
+  color: var(--text);
+  padding: 2px 8px;
+  border-radius: 8px;
+  letter-spacing: 0.01em;
+  ${p =>
+    p.tickTone === 'up' &&
+    css`
+      animation: ${tickFlashUp} 480ms ease-out;
+    `}
+  ${p =>
+    p.tickTone === 'down' &&
+    css`
+      animation: ${tickFlashDown} 480ms ease-out;
+    `}
 `;
 
 const ChartArea = styled.div`
@@ -99,7 +154,14 @@ const formatTime = (ts: number): string => {
   return `${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`;
 };
 
-const formatPrice = (n: number): string =>
+// BTC/USD ticks at $0.01 on Coinbase. Showing whole-dollar prices made
+// most ticks invisible to the trader; we render two decimals everywhere
+// the price is a focal point and integer dollars on Y-axis ticks where
+// space is tight.
+const formatPrice = (n: number, decimals: number = 2): string =>
+  n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+
+const formatAxisPrice = (n: number): string =>
   n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 const computeStrike = (
@@ -124,12 +186,24 @@ export const PriceChart: React.FC<PriceChartProps> = ({
 }) => {
   const [history, setHistory] = useState<Sample[]>([]);
   const lastTickRef = useRef<number>(0);
+  const lastPriceRef = useRef<number>(0);
+  const [tickTone, setTickTone] = useState<'up' | 'down' | 'flat'>('flat');
+  const [tickKey, setTickKey] = useState(0);
 
   useEffect(() => {
     const onTick = (data: PriceData) => {
       if (!data.isValid || data.current <= 0) return;
       if (data.timestamp === lastTickRef.current) return;
       lastTickRef.current = data.timestamp;
+      const prevPrice = lastPriceRef.current;
+      lastPriceRef.current = data.current;
+      if (prevPrice > 0) {
+        const diff = data.current - prevPrice;
+        if (Math.abs(diff) >= 0.005) {
+          setTickTone(diff > 0 ? 'up' : 'down');
+          setTickKey(k => k + 1);
+        }
+      }
       setHistory(prev => {
         const next = [...prev, { ts: data.timestamp, price: data.current }];
         if (next.length > HISTORY_LIMIT) next.splice(0, next.length - HISTORY_LIMIT);
@@ -150,7 +224,12 @@ export const PriceChart: React.FC<PriceChartProps> = ({
   const showEntry = isTradeActive && entryPrice && entryPrice > 0;
   const showStrike = strike !== null && strike > 0 && (!!optionType);
 
-  const tone: 'up' | 'down' | 'flat' = priceData.change.amount > 0 ? 'up' : priceData.change.amount < 0 ? 'down' : 'flat';
+  const sessionTone: 'up' | 'down' | 'flat' =
+    priceData.change.amount > 0 ? 'up' : priceData.change.amount < 0 ? 'down' : 'flat';
+  const changeAbs = Math.abs(priceData.change.amount);
+  const changePct = Math.abs(priceData.change.percentage);
+  const fillStop = sessionTone === 'down' ? 'var(--down)' : 'var(--up)';
+  const lineStroke = sessionTone === 'down' ? 'var(--down)' : 'var(--up)';
 
   const yDomain = useMemo<[number, number]>(() => {
     const prices = history.map(s => s.price);
@@ -167,8 +246,20 @@ export const PriceChart: React.FC<PriceChartProps> = ({
   return (
     <Container>
       <Header>
-        <Title>BTC · USD {!isConnected && <span style={{ color: 'var(--down)' }}>· offline</span>}</Title>
-        <PriceTag tone={tone}>${formatPrice(spot)}</PriceTag>
+        <TitleStack>
+          <Title>
+            <LiveDot live={isConnected} aria-hidden />
+            BTC · USD {!isConnected && <span style={{ color: 'var(--down)' }}>· offline</span>}
+          </Title>
+          <SubLine tone={sessionTone}>
+            {sessionTone === 'flat'
+              ? '— flat —'
+              : `${sessionTone === 'up' ? '▲' : '▼'} $${formatPrice(changeAbs)} (${changePct.toFixed(2)}%)`}
+          </SubLine>
+        </TitleStack>
+        <PriceTag tickTone={tickTone} flashKey={tickKey} aria-live="polite" key={tickKey}>
+          ${formatPrice(spot)}
+        </PriceTag>
       </Header>
 
       <ChartArea>
@@ -176,8 +267,8 @@ export const PriceChart: React.FC<PriceChartProps> = ({
           <AreaChart data={history} margin={{ top: 8, right: 56, left: 8, bottom: 0 }}>
             <defs>
               <linearGradient id="priceFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--up)" stopOpacity={0.25} />
-                <stop offset="100%" stopColor="var(--up)" stopOpacity={0} />
+                <stop offset="0%" stopColor={fillStop} stopOpacity={0.28} />
+                <stop offset="100%" stopColor={fillStop} stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid stroke="var(--border)" strokeDasharray="2 4" vertical={false} />
@@ -194,7 +285,7 @@ export const PriceChart: React.FC<PriceChartProps> = ({
               dataKey="price"
               orientation="right"
               domain={yDomain}
-              tickFormatter={(v: number) => `$${formatPrice(v)}`}
+              tickFormatter={(v: number) => `$${formatAxisPrice(v)}`}
               stroke="var(--text-muted)"
               fontSize={10}
               tickLine={false}
@@ -252,13 +343,14 @@ export const PriceChart: React.FC<PriceChartProps> = ({
             )}
 
             <Area
-              type="linear"
+              type="monotone"
               dataKey="price"
-              stroke="var(--up)"
-              strokeWidth={1.75}
+              stroke={lineStroke}
+              strokeWidth={2}
               fill="url(#priceFill)"
               isAnimationActive={false}
               dot={false}
+              activeDot={{ r: 3, fill: lineStroke, stroke: 'var(--bg-elev)', strokeWidth: 2 }}
             />
           </AreaChart>
         </ResponsiveContainer>
