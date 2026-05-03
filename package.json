@@ -3,7 +3,7 @@
   "private": true,
   "description": "Root proxy so Render's default 'npm install && npm run build' resolves the AT_frontend Vite app.",
   "scripts": {
-    "postinstall": "cd AT_frontend && npm install --no-audit --no-fund",
+    "postinstall": "cd AT_frontend && npm install --include=dev --no-audit --no-fund",
     "build": "cd AT_frontend && npm run build && cd .. && rm -rf dist && cp -R AT_frontend/dist dist",
     "start": "node server.mjs",
     "preview": "cd AT_frontend && npm run preview",
