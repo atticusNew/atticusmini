@@ -1,16 +1,16 @@
 import React, { createContext, useContext, ReactNode } from 'react';
-import { useUnifiedAuth } from '../hooks/useUnifiedAuth';
+import { useUnifiedAuth, UnifiedUser } from '../hooks/useUnifiedAuth';
 
 interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
-  user: any;
-  principal: any;
-  authMethod: any;
-  signInWithICP: () => Promise<any>;
-  signInWithTwitter: () => Promise<any>;
-  signInWithGoogle: (credentialResponse: any) => Promise<any>;
+  user: UnifiedUser | null;
+  principal: string | null;
+  authMethod: 'demo' | null;
+  signInWithICP: () => Promise<UnifiedUser | null>;
+  signInWithTwitter: () => Promise<UnifiedUser | null>;
+  signInWithGoogle: (credentialResponse?: any) => Promise<UnifiedUser | null>;
   logout: () => Promise<void>;
   walletGenerating: boolean;
   walletReady: boolean;
@@ -20,23 +20,12 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within an AuthProvider');
+  return ctx;
 };
 
-interface AuthProviderProps {
-  children: ReactNode;
-}
-
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const authData = useUnifiedAuth();
-
-  return (
-    <AuthContext.Provider value={authData}>
-      {children}
-    </AuthContext.Provider>
-  );
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const auth = useUnifiedAuth();
+  return <AuthContext.Provider value={auth as unknown as AuthContextType}>{children}</AuthContext.Provider>;
 };
