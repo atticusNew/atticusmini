@@ -207,6 +207,11 @@ export class LedgerService {
     return this.store.appendTrader(e);
   }
 
+  /** Read-only accessor — used by the account screen to render recent entries. */
+  getTraderEntriesForUser(partnerUserId: string): Promise<TraderLedgerEntry[]> {
+    return this.store.getTraderEntriesForUser(partnerUserId);
+  }
+
   appendHedge(e: AppendHedgeArgs): Promise<HedgeLedgerEntry> {
     return this.store.appendHedge(e);
   }
