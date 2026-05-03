@@ -23,6 +23,15 @@ export default defineConfig(({ mode }) => {
       target: 'es2020',
       sourcemap: true,
       minify: 'esbuild',
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            recharts: ['recharts'],
+            decimal: ['decimal.js'],
+            react: ['react', 'react-dom'],
+          },
+        },
+      },
     },
   }
 })
