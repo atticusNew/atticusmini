@@ -54,7 +54,7 @@ export const FirstTradeHint: React.FC = () => {
       <span className="icon" aria-hidden>👋</span>
       <span>
         First time? Pick <span className="em">▲ UP</span> or <span className="em">▼ DOWN</span>,
-        choose a target price, then how much to stake.
+        then how much it'll move, then how long.
       </span>
       <DismissButton onClick={dismiss} aria-label="Dismiss onboarding hint" type="button">×</DismissButton>
     </Bar>

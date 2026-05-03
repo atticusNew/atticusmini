@@ -392,7 +392,7 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
   const [activeTab, setActiveTab] = useState<'trade' | 'positions' | 'account'>('trade');
   const [optionType, setOptionType] = useState<'call' | 'put' | null>(null);
   const [strikeOffset, setStrikeOffset] = useState(0);
-  const [selectedExpiry, setSelectedExpiry] = useState('5s');
+  const [selectedExpiry, setSelectedExpiry] = useState('1m');
   
   // ✅ OPTIMIZED TRADE STATE: Single consolidated state object
   const [tradeState, setTradeState] = useState<{
