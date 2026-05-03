@@ -5,6 +5,7 @@ import { pricingService, Tenor, TENOR_TO_SECONDS } from '../services/pricing/Pri
 import { useBalance } from '../contexts/BalanceProvider';
 import { useAuth } from '../contexts/AuthProvider';
 import { geoFenceService } from '../services/geofence/GeoFenceService';
+import { TradeReviewSheet } from './TradeReviewSheet';
 
 export interface TradeFormProps {
   currentPrice: number;
@@ -217,6 +218,7 @@ export const TradeForm: React.FC<TradeFormProps> = ({
   const [stake, setStake] = useState<number>(5);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [reviewOpen, setReviewOpen] = useState(false);
 
   const direction = optionType ?? 'call';
   const tone: 'up' | 'down' = direction === 'call' ? 'up' : 'down';
@@ -246,7 +248,7 @@ export const TradeForm: React.FC<TradeFormProps> = ({
 
   const setStakeClamped = (n: number) => setStake(Math.min(STAKE_MAX, Math.max(STAKE_MIN, Math.round(n))));
 
-  const handleStart = async () => {
+  const openReview = () => {
     if (!ready) return;
     setErrorMsg(null);
     const geo = geoFenceService.evaluate((user as { countryCode?: string } | null)?.countryCode);
@@ -258,9 +260,15 @@ export const TradeForm: React.FC<TradeFormProps> = ({
       setErrorMsg('Insufficient balance');
       return;
     }
+    setReviewOpen(true);
+  };
+
+  const handleConfirm = async () => {
+    setErrorMsg(null);
     setSubmitting(true);
     try {
       await onTradeStart(stake, { optionType: direction, strikeOffset, expiry: tenor });
+      setReviewOpen(false);
     } catch (e) {
       setErrorMsg(e instanceof Error ? e.message : 'Trade failed');
     } finally {
@@ -416,7 +424,7 @@ export const TradeForm: React.FC<TradeFormProps> = ({
         <Cta
           type="button"
           disabled={!ready || !live}
-          onClick={handleStart}
+          onClick={openReview}
         >
           {submitting
             ? 'Placing…'
@@ -426,9 +434,21 @@ export const TradeForm: React.FC<TradeFormProps> = ({
                 ? 'Pick direction'
                 : !strikeOffset
                   ? 'Pick strike'
-                  : `Stake $${stake}`}
+                  : `Review · $${stake}`}
         </Cta>
       </Stack>
+
+      <TradeReviewSheet
+        open={reviewOpen && !!live && !!optionType}
+        optionType={direction}
+        tenor={tenor}
+        stake={stake}
+        spotUSD={currentPrice}
+        quote={live}
+        submitting={submitting}
+        onConfirm={handleConfirm}
+        onCancel={() => setReviewOpen(false)}
+      />
     </Container>
   );
 };
