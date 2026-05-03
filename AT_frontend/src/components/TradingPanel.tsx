@@ -3,8 +3,9 @@ import styled from 'styled-components';
 import { useSynchronizedPrice } from '../hooks/useGlobalPriceFeed';
 import { TradeForm } from './TradeForm';
 import { PriceChart } from './PriceChart';
-import { TimerDisplay } from './TimerDisplay';
-import { SellbackCard } from './SellbackCard';
+import { SellbackBar } from './SellbackBar';
+import { CountdownPill } from './CountdownPill';
+import { DemoPill } from './DemoPill';
 import { SimpleTradeHistory } from './SimpleTradeHistory';
 import { ActiveTicketsList } from './ActiveTicketsList';
 import { OnboardingModal } from './OnboardingModal';
@@ -974,7 +975,7 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
 
   // ✅ REMOVED: Unused activeTradeData variable that was causing build error
 
-  const { userBalance } = useBalance();
+  useBalance();
 
   return (
     <TradingContainer>
@@ -982,21 +983,14 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
         <LogoContainer>
           <Logo src="/images/attiminlogo.png" alt="Atticus" />
         </LogoContainer>
-        {!isDemoMode && (
-          <div style={{
-            padding: '0.15rem 0.3rem', /* ✅ FIXED: Smaller padding */
-            background: userBalance > 0 ? 'rgba(0, 212, 170, 0.15)' : 'rgba(255, 71, 87, 0.15)',
-            border: `1px solid ${userBalance > 0 ? 'var(--green)' : 'var(--red)'}`,
-            borderRadius: '3px', /* ✅ FIXED: Smaller border radius */
-            fontSize: '0.6rem', /* ✅ FIXED: Smaller font size */
-            fontWeight: '600',
-            color: userBalance > 0 ? 'var(--green)' : 'var(--red)',
-            whiteSpace: 'nowrap',
-            marginRight: '0.5rem' /* ✅ FIXED: Add margin to prevent overlap */
-          }}>
-            {userBalance > 0 ? userBalance.toFixed(6) : '0'} BTC {/* ✅ FIXED: 6 decimals for more precision */}
-          </div>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <CountdownPill
+            isActive={tradeState.isActive}
+            expiry={selectedExpiry}
+            onExpiry={handleAutoSettlement}
+          />
+          {isDemoMode && <DemoPill />}
+        </div>
         <DisconnectButton
           connected={isFullyConnected}
           isDemoMode={isDemoMode}
@@ -1013,7 +1007,7 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
           </ErrorBoundary>
           
           {tradeState.isActive && tradeState.data?.positionId !== undefined && (
-            <SellbackCard
+            <SellbackBar
               ticketId={tradeState.data.positionId}
               spotUSD={priceState.current}
               onSold={() => {
@@ -1028,12 +1022,6 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
               }}
             />
           )}
-
-          <TimerDisplay
-            isActive={tradeState.isActive}
-            expiry={selectedExpiry}
-            onExpiry={handleAutoSettlement}
-          />
         </ChartSection>
 
 
