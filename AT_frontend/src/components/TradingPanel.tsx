@@ -3,9 +3,12 @@ import styled from 'styled-components';
 import { useSynchronizedPrice } from '../hooks/useGlobalPriceFeed';
 import { TradeForm } from './TradeForm';
 import { PriceChart } from './PriceChart';
-import { SellbackBar } from './SellbackBar';
 import { CountdownPill } from './CountdownPill';
 import { DemoPill } from './DemoPill';
+import { ActiveTicketCard } from './ActiveTicketCard';
+import {
+  toastTradePlaced, toastTradeWon, toastTradeLost, toastTradeTie, toastTradeError,
+} from './tradeToasts';
 import { PositionsList } from './PositionsList';
 import { AccountScreen } from './AccountScreen';
 import { OnboardingModal } from './OnboardingModal';
@@ -13,7 +16,9 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { useCanister } from '../contexts/CanisterProvider';
 import { useBalance } from '../contexts/BalanceProvider';
 // import { tradingService, TradeRequest } from '../services/tradingService'; // ✅ REMOVED: Using AtticusService instead
-import { pricingEngine } from '../services/OffChainPricingEngine'; // ✅ NEW: Off-chain settlement
+import { pricingEngine } from '../services/OffChainPricingEngine';
+import { pricingService, type Tenor } from '../services/pricing/PricingService';
+import { isSupportedTenor } from '../services/pricing/tenor';
 // import { useAuth } from '../hooks/useAuth'; // ✅ REMOVED: Using useUnifiedAuth
 import { useAuth } from '../contexts/AuthProvider';
 import { useOnboarding } from '../hooks/useOnboarding';
@@ -433,14 +438,13 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
         isCall: currentTradeData.type === 'call'
       });
       
-      // ✅ NEW: Use off-chain settlement (fast, accurate, uniform)
-      const result = await pricingEngine.calculateSettlement(
+      const result = pricingEngine.calculateSettlement(
         currentTradeData.type,
         currentTradeData.strikeOffset,
         currentTradeData.expiry,
         currentPrice,
         currentTradeData.entryPrice,
-        currentTradeData.amount // ✅ FIXED: Pass contract count
+        currentTradeData.amount,
       );
       
       // ✅ RECORD: Send result to backend for storage only
@@ -458,103 +462,14 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
       }
 
 
-      // ✅ OPTIMIZED: Single state update for settlement result
-      setTradeState(prev => ({
-        ...prev,
-        settlementResult: {
-          outcome: result.outcome,
-          profit: result.profit || 0,
-          payout: result.payout || 0,
-          finalPrice: result.finalPrice || 0,
-          strikePrice: result.strikePrice || 0,  // ✅ Add strike price from settlement calculation
-          entryPrice: tradeState.entryPrice,  // ✅ Preserve for strike calculation
-          strikeOffset: tradeState.data?.strikeOffset,  // ✅ Preserve for strike calculation
-          optionType: tradeState.data?.type  // ✅ Preserve for strike calculation
-        },
-        result: {
-          message: result.outcome === 'win' 
-            ? `WIN! +$${(result.profit || 0).toFixed(2)}` 
-            : `LOSS -$${Math.abs(result.profit || 0).toFixed(2)}`,
-          type: result.outcome === 'win' ? 'success' : 'error'
-        }
-      }));
-      
-      console.log('🔍 Final toast message:', result.outcome === 'win' 
-        ? `WIN! +$${(result.profit || 0).toFixed(2)}` 
-        : `LOSS -$${Math.abs(result.profit || 0).toFixed(2)}`);
-
-      // Auto-clear trade result after 3 seconds using requestAnimationFrame
-      const clearResult = () => {
-        setTradeState(prev => ({ ...prev, result: null }));
-      };
-      requestAnimationFrame(() => {
-        setTimeout(clearResult, 3000);
-      });
-
-      // ✅ FIXED: Trade cleanup without clearing settlement result (let timeout handle it)
-      setTradeState(prev => ({
-        ...prev,
-        isActive: false,
-        isInProgress: false,
-        data: null,
-        entryPrice: undefined,
-        countdown: 0,
-        statusMessage: null
-        // ✅ KEEP: result and settlementResult stay visible until timeout clears them
-      }));
-
-      // ✅ ADDED: Separate timeout for settlement result clearing
-      const clearSettlementResult = () => {
-        setTradeState(prev => ({ ...prev, settlementResult: null }));
-      };
-      requestAnimationFrame(() => {
-        setTimeout(clearSettlementResult, 5000);
-      });
-      
-      // Reset form state
-      setOptionType(null);
-      setStrikeOffset(0);
-
-      // ✅ IMPROVED: Refresh balance after settlement with retry logic
-      if (!isDemoMode) {
-        const refreshBalanceWithRetry = async (attempt: number = 1, maxAttempts: number = 3) => {
-          try {
-            await refreshBalance();
-            return true;
-          } catch (error) {
-            console.warn(`⚠️ Failed to refresh balance after settlement (attempt ${attempt}):`, error);
-            if (attempt < maxAttempts) {
-              // Retry with exponential backoff
-              const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
-              setTimeout(() => refreshBalanceWithRetry(attempt + 1, maxAttempts), delay);
-            }
-            return false;
-          }
-        };
-
-        try {
-          
-          // Immediate refresh attempt
-          await refreshBalanceWithRetry(1, 3);
-          
-          // Delayed refresh attempt to ensure backend processing
-          setTimeout(() => refreshBalanceWithRetry(1, 3), 1500);
-          
-        } catch (error) {
-          console.warn('⚠️ Failed to refresh balance after settlement:', error);
-        }
-      }
-
       if (result.outcome === 'win') {
-      } else if (result.outcome === 'loss') {
+        toastTradeWon({ profit: result.profit, payout: result.payout });
+      } else if (result.outcome === 'tie') {
+        toastTradeTie({ refund: result.payout });
       } else {
+        toastTradeLost({ loss: result.profit });
       }
 
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error('❌ Auto-settlement failed:', errorMessage);
-
-      // ✅ CRITICAL: Always clean up trade state even if settlement fails
       setTradeState({
         isActive: false,
         isInProgress: false,
@@ -563,14 +478,33 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
         countdown: 0,
         statusMessage: null,
         result: null,
-        settlementResult: null
+        settlementResult: null,
+      });
+      
+      // Reset form state
+      setOptionType(null);
+      setStrikeOffset(0);
+
+      refreshBalance().catch(() => {});
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('❌ Auto-settlement failed:', errorMessage);
+      toastTradeError(`Settlement failed: ${errorMessage}`);
+
+      setTradeState({
+        isActive: false,
+        isInProgress: false,
+        data: null,
+        entryPrice: undefined,
+        countdown: 0,
+        statusMessage: null,
+        result: null,
+        settlementResult: null,
       });
       setOptionType(null);
       setStrikeOffset(0);
-      
-      // Error will be handled by settlement result state
     }
-  }, []); // ✅ FIXED: Remove dependencies to prevent timer resets
+  }, []);
 
   // ✅ REMOVED: Timer logic moved to separate TimerDisplay component to prevent re-renders
 
@@ -728,36 +662,22 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
       };
 
 
-      // ✅ OPTIMIZED: Single state update with captured price for perfect synchronization
       setTradeState({
         isActive: true,
         isInProgress: false,
         data: tradeData,
-        entryPrice: tradeStartPrice || 0, // ✅ PERFECT SYNC: Entry line shows captured BTC price at trade start
+        entryPrice: tradeStartPrice || 0,
         countdown: 0,
-        statusMessage: 'Trade successful!',
-        result: {
-          message: `Trade started: ${finalOptionType.toUpperCase()}`,
-          type: 'success'
-        },
+        statusMessage: null,
+        result: null,
         settlementResult: null,
-        activeOptionType: finalOptionType,    // ✅ ADDED: Store for chart
-        activeStrikeOffset: finalStrikeOffset  // ✅ ADDED: Store for chart
+        activeOptionType: finalOptionType,
+        activeStrikeOffset: finalStrikeOffset,
       });
 
-      // Clear status message after 3 seconds using requestAnimationFrame
-      const clearStatus = () => {
-        setTradeState(prev => ({ ...prev, statusMessage: null }));
-      };
-      requestAnimationFrame(() => {
-        setTimeout(clearStatus, 3000);
-      });
-
-      // ✅ REMOVED: Balance refresh during trade to prevent oscillation
-      // Balance will be refreshed after trade completion
-
-      // ✅ REMOVED: Auto-clear trade start message - keep status visible during entire trade
-      // Status will only be cleared when trade ends or user manually closes
+      toastTradePlaced({ direction: finalOptionType, stake: contracts, tenor: finalExpiry });
+      refreshBalance().catch(() => {});
+      setActiveTab('trade');
 
       // Auto-scroll to show chart on mobile
       if (window.innerWidth <= 767) {
@@ -775,25 +695,16 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('❌ Failed to start trade:', errorMessage);
-      
-      // ✅ CRITICAL: Always reset trade state on error
+      toastTradeError(errorMessage);
       setTradeState({
         isActive: false,
         isInProgress: false,
         data: null,
         entryPrice: undefined,
         countdown: 0,
-        statusMessage: `Trade failed: ${errorMessage}`,
+        statusMessage: null,
         result: null,
-        settlementResult: null
-      });
-      
-      // Clear status message after 5 seconds using requestAnimationFrame
-      const clearErrorStatus = () => {
-        setTradeState(prev => ({ ...prev, statusMessage: null }));
-      };
-      requestAnimationFrame(() => {
-        setTimeout(clearErrorStatus, 5000);
+        settlementResult: null,
       });
     }
   };
@@ -847,10 +758,6 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
     ...(tradeState.entryPrice !== undefined && { entryPrice: tradeState.entryPrice })
   };
 
-  // ✅ REMOVED: Unused activeTradeData variable that was causing build error
-
-  useBalance();
-
   return (
     <TradingContainer>
       <Header>
@@ -879,117 +786,7 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
           <ErrorBoundary fallback={<div>Chart temporarily unavailable</div>}>
             <PriceChart {...chartProps} />
           </ErrorBoundary>
-          
-          {tradeState.isActive && tradeState.data?.positionId !== undefined && (
-            <SellbackBar
-              ticketId={tradeState.data.positionId}
-              spotUSD={priceState.current}
-              onSold={() => {
-                setTradeState(prev => ({
-                  ...prev,
-                  isActive: false,
-                  isInProgress: false,
-                  data: null,
-                  result: { message: 'Sold back early', type: 'success' },
-                }));
-                refreshBalance().catch(() => {});
-              }}
-            />
-          )}
         </ChartSection>
-
-
-        {/* Trade Status Container - Between Chart and Options */}
-        {tradeState.result && (
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            alignItems: 'center',
-            padding: '0.75rem 1rem',
-            margin: '0.5rem 0',
-            background: tradeState.result.type === 'success' ? '#00aa33' : '#ff4444',
-            color: 'white',
-            borderRadius: '8px',
-            fontSize: '0.9rem',
-            fontWeight: '600',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
-            textAlign: 'center',
-            minHeight: '2.5rem'
-          }}>
-            <div>{tradeState.result.message}</div>
-            {/* ✅ ENHANCED: Show settlement details if available */}
-            {tradeState.settlementResult && (
-              <div style={{
-                marginTop: '0.5rem',
-                padding: '0.5rem',
-                background: 'rgba(255, 255, 255, 0.2)',
-                borderRadius: '6px',
-                fontSize: '0.8rem',
-                display: 'flex',
-                justifyContent: 'space-between',
-                gap: '1rem',
-                width: '100%',
-                maxWidth: '400px'
-              }}>
-                <div>
-                  <strong>Result:</strong> {tradeState.settlementResult.outcome.toUpperCase()}
-                </div>
-                <div>
-                  <strong>Settlement:</strong> ${(tradeState.settlementResult.finalPrice || 0).toLocaleString('en-US', { 
-                    minimumFractionDigits: 2, 
-                    maximumFractionDigits: 2 
-                  })}
-                </div>
-                <div>
-                  <strong>Strike:</strong> ${(tradeState.settlementResult.strikePrice || 0).toLocaleString('en-US', { 
-                    minimumFractionDigits: 2, 
-                    maximumFractionDigits: 2 
-                  })}
-                </div>
-              </div>
-            )}
-            {/* ✅ ENHANCED: Show trade details if available */}
-            {tradeState.isActive && tradeState.data && (
-              <div style={{
-                marginTop: '0.5rem',
-                padding: '0.5rem',
-                background: 'rgba(255, 255, 255, 0.2)',
-                borderRadius: '6px',
-                fontSize: '0.8rem',
-                display: 'flex',
-                justifyContent: 'space-between',
-                gap: '1rem',
-                width: '100%',
-                maxWidth: '400px'
-              }}>
-                <div>
-                  <strong>Strike:</strong> ${(() => {
-                    const entryPrice = tradeState.entryPrice || 0;
-                    const strikeOffset = tradeState.data.strikeOffset || 0;
-                    const optionType = tradeState.data.type;
-                    const strikePrice = optionType === 'call' 
-                      ? entryPrice + strikeOffset 
-                      : entryPrice - strikeOffset;
-                    return strikePrice.toLocaleString('en-US', { 
-                      minimumFractionDigits: 2, 
-                      maximumFractionDigits: 2 
-                    });
-                  })()}
-                </div>
-                <div>
-                  <strong>Entry:</strong> ${(tradeState.entryPrice || 0).toLocaleString('en-US', { 
-                    minimumFractionDigits: 2, 
-                    maximumFractionDigits: 2 
-                  })}
-                </div>
-                <div>
-                  <strong>Type:</strong> {tradeState.data.type.toUpperCase()}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
 
         <TradingSidebar>
           <TabContainer>
@@ -1007,19 +804,59 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
           <TabContent>
             {activeTab === 'trade' && (
               <ErrorBoundary fallback={<div>Trading form unavailable</div>}>
-                <TradeForm
-                  currentPrice={priceState.current}
-                  optionType={optionType}
-                  strikeOffset={strikeOffset}
-                  isTradeActive={tradeState.isActive}
-                  isTradeInProgress={tradeState.isInProgress}
-                  onOptionTypeSelect={handleOptionTypeSelect}
-                  onStrikeOffsetSelect={handleStrikeOffsetSelect}
-                  onExpirySelect={handleExpirySelect}
-                  onTradeStart={handleTradeStart}
-                  isConnected={isFullyConnected}
-                  isDemoMode={isDemoMode}
-                />
+                {tradeState.isActive && tradeState.data ? (
+                  (() => {
+                    const td = tradeState.data;
+                    const entry = tradeState.entryPrice ?? td.entryPrice;
+                    const strike = td.type === 'call' ? entry + td.strikeOffset : entry - td.strikeOffset;
+                    let payoutMultiple = 1;
+                    if (isSupportedTenor(td.expiry)) {
+                      payoutMultiple = pricingService.quote({
+                        optionType: td.type,
+                        spotUSD: entry,
+                        strikeOffsetUSD: td.strikeOffset,
+                        tenor: td.expiry as Tenor,
+                        contracts: td.amount,
+                      }).payoutMultiple;
+                    }
+                    return (
+                      <ActiveTicketCard
+                        ticketId={td.positionId}
+                        spotUSD={priceState.current}
+                        optionType={td.type}
+                        strikePrice={strike}
+                        entryPrice={entry}
+                        tenor={td.expiry}
+                        stake={td.amount}
+                        potentialPayout={td.amount * payoutMultiple}
+                        onSold={() => {
+                          setTradeState({
+                            isActive: false, isInProgress: false, data: null,
+                            entryPrice: undefined, countdown: 0, statusMessage: null,
+                            result: null, settlementResult: null,
+                          });
+                          setOptionType(null);
+                          setStrikeOffset(0);
+                          refreshBalance().catch(() => {});
+                        }}
+                      />
+                    );
+                  })()
+                ) : (
+                  <TradeForm
+                    currentPrice={priceState.current}
+                    optionType={optionType}
+                    strikeOffset={strikeOffset}
+                    isTradeActive={tradeState.isActive}
+                    isTradeInProgress={tradeState.isInProgress}
+                    onOptionTypeSelect={handleOptionTypeSelect}
+                    onStrikeOffsetSelect={handleStrikeOffsetSelect}
+                    onExpirySelect={handleExpirySelect}
+                    onTradeStart={handleTradeStart}
+                    isConnected={isFullyConnected}
+                    isDemoMode={isDemoMode}
+                  />
+                )}
               </ErrorBoundary>
             )}
 
