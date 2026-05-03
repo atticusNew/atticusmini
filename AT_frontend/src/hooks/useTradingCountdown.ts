@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { tenorToSeconds } from '../services/pricing/tenor';
 
 interface TradeData {
   entryPrice: number;
@@ -38,7 +39,7 @@ export const useTradingCountdown = (
     const updateCountdown = () => {
       const now = Date.now();
       const elapsed = Math.floor((now - tradeData.startTime) / 1000);
-      const expirySeconds = parseInt(tradeData.expiry.replace('s', ''));
+      const expirySeconds = tenorToSeconds(tradeData.expiry);
       const remaining = Math.max(0, expirySeconds - elapsed);
       
       setCountdown(remaining);

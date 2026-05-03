@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import styled, { keyframes } from 'styled-components';
+import { tenorToSeconds } from '../services/pricing/tenor';
 
 interface TimerDisplayProps {
   isActive: boolean;
@@ -64,7 +65,7 @@ export const TimerDisplay: React.FC<TimerDisplayProps> = ({ isActive, expiry, on
       return;
     }
 
-    const expirySeconds = parseInt(expiry.replace('s', ''));
+    const expirySeconds = tenorToSeconds(expiry);
     setDisplayTime(expirySeconds);
     startTimeRef.current = Date.now();
 
@@ -96,9 +97,21 @@ export const TimerDisplay: React.FC<TimerDisplayProps> = ({ isActive, expiry, on
     return null;
   }
 
+  const formatRemaining = (s: number): string => {
+    if (s < 60) return `${s}s`;
+    if (s < 3600) {
+      const m = Math.floor(s / 60);
+      const sec = s % 60;
+      return `${m}:${sec.toString().padStart(2, '0')}`;
+    }
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    return `${h}:${m.toString().padStart(2, '0')}`;
+  };
+
   return (
     <TimerContainer isActive={isActive}>
-      {displayTime}s
+      {formatRemaining(displayTime)}
     </TimerContainer>
   );
 };
