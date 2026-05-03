@@ -5,6 +5,7 @@ import { useCanister } from '../contexts/CanisterProvider';
 import { useBalance } from '../contexts/BalanceProvider';
 import { Tooltip } from './Tooltip';
 import { pricingService, Tenor, TENOR_TO_SECONDS } from '../services/pricing/PricingService';
+import { geoFenceService } from '../services/geofence/GeoFenceService';
 
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error) {
@@ -501,13 +502,18 @@ export const OptionsTradeForm: React.FC<OptionsTradeFormProps> = ({
   };
 
   const handleTradeStart = async () => {
-    // Prevent any action if trade is in progress or already submitting
     if (isSubmitting || isTradeInProgress || !canTrade) {
       console.log('Cannot start trade: button disabled or trade in progress');
       return;
     }
 
     if (!optionType || !strikeOffset || !localFormData.expiry || !localFormData.contracts) {
+      return;
+    }
+
+    const geo = geoFenceService.evaluate((user as { countryCode?: string } | null)?.countryCode);
+    if (!geo.allowed) {
+      console.warn('Trade blocked by geo-fence:', geo);
       return;
     }
 
