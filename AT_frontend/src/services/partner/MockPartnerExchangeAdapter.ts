@@ -34,6 +34,14 @@ export class MockPartnerExchangeAdapter implements PartnerExchangeAdapter {
   private nextTicketId = 1;
   private idempotency = new Map<string, number>();
 
+  /** Wipe all state. Used by the demo "Reset" button. */
+  reset(): void {
+    this.users.clear();
+    this.tickets.clear();
+    this.idempotency.clear();
+    this.nextTicketId = 1;
+  }
+
   async getSession(): Promise<PartnerSession | null> {
     await this.ensureUser(DEMO_SESSION.partnerUserId);
     return DEMO_SESSION;

@@ -6,6 +6,8 @@ import { TradeProvider } from '../contexts/TradeContext';
 import { CanisterProvider } from '../contexts/CanisterProvider';
 import { BalanceProvider } from '../contexts/BalanceProvider';
 import { ToastProvider } from './ToastProvider';
+import { DemoBanner } from './DemoBanner';
+import { AdminPage } from './admin/AdminPage';
 
 const GlobalStyle = createGlobalStyle`
   :root {
@@ -65,13 +67,29 @@ const LoadingText = styled.p`
   text-align: center;
 `;
 
+const isAdminRoute = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  return window.location.pathname.replace(/\/+$/, '') === '/admin';
+};
+
 const AppContent: React.FC = () => {
   const { isLoading, logout } = useAuth();
+
+  if (isAdminRoute()) {
+    return (
+      <>
+        <GlobalStyle />
+        <DemoBanner />
+        <AdminPage />
+      </>
+    );
+  }
 
   if (isLoading) {
     return (
       <>
         <GlobalStyle />
+        <DemoBanner />
         <LoadingContainer>
           <LoadingSpinner />
           <LoadingText>Loading Atticus...</LoadingText>
@@ -83,6 +101,7 @@ const AppContent: React.FC = () => {
   return (
     <>
       <GlobalStyle />
+      <DemoBanner />
       <ToastProvider />
       <TradingPanel
         onLogout={async () => { await logout(); }}
