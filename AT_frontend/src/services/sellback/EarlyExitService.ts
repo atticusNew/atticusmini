@@ -20,15 +20,17 @@ import { pricingService, type Tenor } from '../pricing/PricingService';
 import { tenorToSeconds, isSupportedTenor } from '../pricing/tenor';
 import { getPartnerExchange, type PartnerTicket } from '../partner';
 
+/**
+ * v5 lockout schedule. Slightly more lockout on the longer tenors so
+ * the trader can't hold to t=lockout-1s and capture the ~95%-prob
+ * refund. UX-invisible delta (5s vs 10s on a 3m trade is rounding
+ * error) but meaningful platform protection.
+ */
 const LOCKOUT_SECONDS_BY_TENOR: Record<Tenor, number> = {
-  '5s': 5,
-  '10s': 5,
-  '15s': 5,
   '30s': 5,
   '1m': 5,
-  '5m': 10,
-  '15m': 15,
-  '1h': 30,
+  '2m': 8,
+  '3m': 10,
 };
 
 export interface SellbackQuote {

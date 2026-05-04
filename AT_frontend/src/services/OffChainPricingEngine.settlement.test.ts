@@ -28,10 +28,10 @@ test('win without frozen multiple re-quotes via PricingService for supported ten
     optionType: 'put',
     spotUSD: 70_000,
     strikeOffsetUSD: 50,
-    tenor: '5m',
+    tenor: '2m',
     contracts: 3,
   }).payoutMultiple;
-  const r = engine.calculateSettlement('put', 50, '5m', 69_900, 70_000, 3);
+  const r = engine.calculateSettlement('put', 50, '2m', 69_900, 70_000, 3);
   assert.equal(r.outcome, 'win');
   assert.ok(Math.abs(r.payout - 3 * expected) < 1e-9);
 });
@@ -68,11 +68,11 @@ test('settlement matches what a fresh quote would have shown the user', () => {
     optionType: 'call',
     spotUSD: 65_000,
     strikeOffsetUSD: 100,
-    tenor: '15m',
+    tenor: '3m',
     contracts: 7,
   });
   const r = engine.calculateSettlement(
-    'call', 100, '15m', 65_500, 65_000, 7, q.payoutMultiple,
+    'call', 100, '3m', 65_500, 65_000, 7, q.payoutMultiple,
   );
   assert.equal(r.outcome, 'win');
   assert.ok(Math.abs(r.payout - q.potentialPayoutUSD.toNumber()) < 1e-6);

@@ -21,17 +21,20 @@ import { Decimal } from 'decimal.js';
 import { digitalCallProb, digitalPutProb, optionValue } from './blackScholes';
 import { realizedVolatility } from './realizedVolatility';
 
-export type Tenor = '30s' | '1m' | '5m' | '15m' | '1h' | '5s' | '10s' | '15s';
+/**
+ * v5: micro-options ladder — 30s · 1m · 2m · 3m. Long tenors (5m,
+ * 15m, 1h) and legacy ultras (5s, 10s, 15s) are gone from the live
+ * union. The string parser in `tenorToSeconds` still accepts arbitrary
+ * `Ns/Nm/Nh` strings as a fallback for cached tickets from earlier
+ * deploys, so settlement / sell-back keep working through the cutover.
+ */
+export type Tenor = '30s' | '1m' | '2m' | '3m';
 
 export const TENOR_TO_SECONDS: Record<Tenor, number> = {
-  '5s': 5,
-  '10s': 10,
-  '15s': 15,
   '30s': 30,
   '1m': 60,
-  '5m': 5 * 60,
-  '15m': 15 * 60,
-  '1h': 60 * 60,
+  '2m': 2 * 60,
+  '3m': 3 * 60,
 };
 
 const SECONDS_PER_YEAR = 365 * 24 * 60 * 60;
@@ -64,25 +67,16 @@ const HARD_CEILING_MULTIPLE = 25;
 const BASE_EDGE_PCT = 0.05;
 
 /**
- * Tenor-dependent edge: shorter tenors get a bigger edge to compensate for
- * adverse selection by latency-arbitraging bots.
+ * Tenor-dependent edge: shorter tenors get a bigger edge to compensate
+ * for adverse selection by latency-arbitraging bots. v5 schedule keeps
+ * the steeper slope at the short end now that the ladder caps at 3m.
  */
 const tenorEdgePct = (tenor: Tenor): number => {
   switch (tenor) {
-    case '5s':
-    case '10s':
-    case '15s':
-      return 0.20;
-    case '30s':
-      return 0.10;
-    case '1m':
-      return 0.06;
-    case '5m':
-      return 0.03;
-    case '15m':
-      return 0.02;
-    case '1h':
-      return 0.01;
+    case '30s': return 0.10;
+    case '1m':  return 0.06;
+    case '2m':  return 0.04;
+    case '3m':  return 0.03;
   }
 };
 

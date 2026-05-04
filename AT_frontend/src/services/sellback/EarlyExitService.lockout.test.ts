@@ -44,21 +44,32 @@ test('1m ticket fresh: secondsUntilLockout is full window minus lockout (5s)', a
   assert.equal(q.secondsUntilLockout, 60 - 5);
 });
 
-test('5m ticket halfway through has 290s remaining and 280s until lockout', async () => {
+test('2m ticket 10s in: 110s remaining, 102s until lockout (8s lockout)', async () => {
   const adapter = seedAdapter();
-  const t = await placeTicket(adapter, '5m');
+  const t = await placeTicket(adapter, '2m');
   const ee = new EarlyExitService();
   const now = t.openedAt + 10_000;
   const q = ee.quote(t, 70_000, now);
-  assert.equal(q.secondsRemaining, 290);
-  assert.equal(q.secondsUntilLockout, 290 - 10);
+  assert.equal(q.secondsRemaining, 110);
+  assert.equal(q.secondsUntilLockout, 110 - 8);
+});
+
+test('3m ticket halfway through: 90s remaining, 80s until lockout (10s lockout)', async () => {
+  const adapter = seedAdapter();
+  const t = await placeTicket(adapter, '3m');
+  const ee = new EarlyExitService();
+  const now = t.openedAt + 90_000;
+  const q = ee.quote(t, 70_000, now);
+  assert.equal(q.secondsRemaining, 90);
+  assert.equal(q.secondsUntilLockout, 90 - 10);
 });
 
 test('inside lockout window the quote is unavailable and secondsUntilLockout is 0 or negative', async () => {
   const adapter = seedAdapter();
-  const t = await placeTicket(adapter, '5m');
+  const t = await placeTicket(adapter, '2m');
   const ee = new EarlyExitService();
-  const now = t.openedAt + (5 * 60 - 5) * 1000;
+  // 2m tenor, 8s lockout. Jump to t = (120 - 5)s.
+  const now = t.openedAt + (2 * 60 - 5) * 1000;
   const q = ee.quote(t, 70_000, now);
   assert.equal(q.available, false);
   assert.match(q.reason ?? '', /locked out/);

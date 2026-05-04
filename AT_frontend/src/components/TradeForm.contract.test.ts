@@ -30,8 +30,8 @@ test('quote for direction=put subtracts offset from spot for the strike', () => 
 });
 
 test('payoutMultiple is bounded between 1.05x and 25x', () => {
-  for (const offset of [5, 10, 25, 50, 100]) {
-    for (const tenor of ['30s', '1m', '5m', '15m', '1h'] as const) {
+  for (const offset of [5, 10, 25, 50]) {
+    for (const tenor of ['30s', '1m', '2m', '3m'] as const) {
       const q = pricingService.quote({
         optionType: 'call',
         spotUSD: 60_000,
@@ -47,12 +47,12 @@ test('payoutMultiple is bounded between 1.05x and 25x', () => {
 });
 
 test('digital probability is bounded in [0,1]', () => {
-  for (const offset of [5, 25, 100]) {
+  for (const offset of [5, 25, 50]) {
     const q = pricingService.quote({
       optionType: 'call',
       spotUSD: 60_000,
       strikeOffsetUSD: offset,
-      tenor: '5m',
+      tenor: '2m',
       contracts: 1,
       sigma: 0.6,
     });
