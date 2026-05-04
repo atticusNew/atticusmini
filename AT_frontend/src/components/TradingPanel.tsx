@@ -13,7 +13,6 @@ import {
 } from './tradeToasts';
 import { PositionsList } from './PositionsList';
 import { AccountScreen } from './AccountScreen';
-import { OnboardingModal } from './OnboardingModal';
 import { ErrorBoundary } from './ErrorBoundary';
 import { useCanister } from '../contexts/CanisterProvider';
 import { useBalance } from '../contexts/BalanceProvider';
@@ -23,8 +22,6 @@ import { pricingService, type Tenor } from '../services/pricing/PricingService';
 import { isSupportedTenor } from '../services/pricing/tenor';
 // import { useAuth } from '../hooks/useAuth'; // ✅ REMOVED: Using useUnifiedAuth
 import { useAuth } from '../contexts/AuthProvider';
-import { useOnboarding } from '../hooks/useOnboarding';
-
 const TradingContainer = styled.div`
   display: flex;
   flex-direction: column;
@@ -323,7 +320,6 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
   const { isConnected: canisterConnected, atticusService } = useCanister();
   const { user } = useAuth();
   const { refreshBalance } = useBalance();
-  const { showOnboarding, handleClose, handleDontShowAgain } = useOnboarding(isDemoMode);
   const { dismiss: dismissFirstTradeHint } = useFirstTradeHint();
 
   const [activeTab, setActiveTab] = useState<'trade' | 'positions' | 'account'>('trade');
@@ -865,11 +861,6 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
         </MobileTab>
       </MobileFooter>
 
-      <OnboardingModal
-        isOpen={showOnboarding}
-        onClose={handleClose}
-        onDontShowAgain={handleDontShowAgain}
-      />
     </TradingContainer>
   );
 };
