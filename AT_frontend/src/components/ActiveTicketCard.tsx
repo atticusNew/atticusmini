@@ -168,9 +168,12 @@ export const ActiveTicketCard: React.FC<ActiveTicketCardProps> = props => {
   const totalSec = tenorToSeconds(tenor) || 0;
   const elapsed = ticket ? Math.max(0, Math.floor((now - ticket.openedAt) / 1000)) : 0;
   const remaining = Math.max(0, totalSec - elapsed);
-  const ratio = totalSec > 0 ? remaining / totalSec : 1;
+  // v5: absolute thresholds. With the ladder capped at 3m, a ratio
+  // gate would put a 3m trade in 'warn' for the full last 54s — too
+  // much yellow, blunts the urgency cue. 'last 15s warn / last 5s
+  // critical' reads identically across all four tenors.
   const timerTone: 'normal' | 'warn' | 'critical' =
-    ratio < 0.15 ? 'critical' : ratio < 0.3 ? 'warn' : 'normal';
+    remaining <= 5 ? 'critical' : remaining <= 15 ? 'warn' : 'normal';
 
   const refund = quote ? quote.refundUSD.toNumber() : 0;
   const pnl = quote ? quote.pnlUSD.toNumber() : 0;
