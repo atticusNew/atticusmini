@@ -97,7 +97,7 @@ test('shorter tenor carries higher edge than longer tenor', () => {
     optionType: 'call',
     spotUSD: 60_000,
     strikeOffsetUSD: 5,
-    tenor: '1h',
+    tenor: '3m',
     contracts: 1,
     sigma: 0.6,
   });
@@ -109,8 +109,8 @@ test('markToMarketUSD on a deep-ITM call returns positive value below cap', () =
     optionType: 'call',
     spotUSD: 60_100,
     strikeUSD: 60_000,
-    tenor: '5m',
-    secondsRemaining: 200,
+    tenor: '3m',
+    secondsRemaining: 120,
     contracts: 1,
     sigma: 0.6,
   });
@@ -123,7 +123,7 @@ test('markToMarketUSD on expired ticket is zero', () => {
     optionType: 'call',
     spotUSD: 60_000,
     strikeUSD: 60_005,
-    tenor: '5m',
+    tenor: '3m',
     secondsRemaining: 0,
     contracts: 1,
   });

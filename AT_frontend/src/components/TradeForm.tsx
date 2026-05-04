@@ -6,6 +6,7 @@ import { useBalance } from '../contexts/BalanceProvider';
 import { useAuth } from '../contexts/AuthProvider';
 import { geoFenceService } from '../services/geofence/GeoFenceService';
 import { TradeReviewSheet } from './TradeReviewSheet';
+import { InfoTooltip } from './InfoTooltip';
 
 export interface TradeFormProps {
   currentPrice: number;
@@ -30,7 +31,7 @@ export interface TradeFormProps {
  * the Risk → Win line below, which updates as the trader taps.
  */
 const STRIKE_OFFSETS = [5, 10, 25, 50] as const;
-const TENORS: Tenor[] = ['30s', '1m', '5m', '15m'];
+const TENORS: Tenor[] = ['30s', '1m', '2m', '3m'];
 const STAKE_MIN = 1;
 const STAKE_MAX = 100;
 
@@ -319,7 +320,14 @@ export const TradeForm: React.FC<TradeFormProps> = ({
       </FormRow>
 
       <FormRow>
-        <FormRowLabel>By how much?</FormRowLabel>
+        <FormRowLabel>
+          By how much?
+          <InfoTooltip label="What does the dollar amount mean?">
+            How far BTC has to move from where it is right now. Smaller moves
+            are more likely (smaller payout). Bigger moves are harder
+            (bigger payout). Watch the “Risk → Win” line below as you tap.
+          </InfoTooltip>
+        </FormRowLabel>
         <FormRowControl>
           <ButtonGroup cols={4}>
             {STRIKE_OFFSETS.map(offset => {
@@ -341,7 +349,14 @@ export const TradeForm: React.FC<TradeFormProps> = ({
       </FormRow>
 
       <FormRow>
-        <FormRowLabel>By when?</FormRowLabel>
+        <FormRowLabel>
+          By when?
+          <InfoTooltip label="Why does the time window matter?">
+            Shorter trades pay slightly less because there's less time for the
+            price to move. Longer trades give the price more time to reach
+            your target — and pay more if you're right.
+          </InfoTooltip>
+        </FormRowLabel>
         <FormRowControl>
           <ButtonGroup cols={4}>
             {TENORS.map(t => (

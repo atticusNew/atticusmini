@@ -19,7 +19,7 @@ const placeTicket = async (adapter: LedgerWritingPartnerExchange) => {
     userId: 'u-test',
     optionType: 'call',
     strikeOffsetUSD: 5,
-    tenor: '5m',
+    tenor: '2m',
     contracts: 1,
     entryPriceUSD: new Decimal(60_000),
     strikePriceUSD: new Decimal(60_005),
@@ -52,7 +52,8 @@ test('quote returns unavailable in lockout window', async () => {
   const { adapter } = seedAdapter();
   const ticket = await placeTicket(adapter);
   const ee = new EarlyExitService();
-  const tenorSec = 5 * 60;
+  // 2m tenor has an 8s lockout in v5; jump to t=tenor−5s (inside it).
+  const tenorSec = 2 * 60;
   const lateOpenedAt = Date.now() - (tenorSec - 5) * 1000;
   const q = ee.quote({ ...ticket, openedAt: lateOpenedAt }, 60_000);
   assert.equal(q.available, false);
@@ -87,8 +88,8 @@ test('sell() cancels the ticket and credits the refund via the ledger', async ()
 test('sell() in lockout window is rejected without state change', async () => {
   const { adapter } = seedAdapter();
   const ticket = await placeTicket(adapter);
-  const tenorSec = 5 * 60;
-  // Force lockout by mutating the ticket's openedAt directly through getTicket
+  const tenorSec = 2 * 60;
+  // Force lockout (8s on 2m tenor in v5) by mutating openedAt.
   const t = (await adapter.getTicket(ticket.id))!;
   t.openedAt = Date.now() - (tenorSec - 2) * 1000;
 
