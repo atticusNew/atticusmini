@@ -1,6 +1,10 @@
 /**
- * Helpers for parsing trader-facing tenor strings ('30s', '1m', '5m', '15m', '1h')
- * into seconds. Centralized so countdown / timer / pricer all agree.
+ * Helpers for parsing trader-facing tenor strings into seconds.
+ *
+ * v5: live ladder is `30s · 1m · 2m · 3m`. The string parser still
+ * accepts arbitrary `Ns / Nm / Nh` so settlement / sell-back keep
+ * working for any tickets created against legacy tenors before the
+ * cutover.
  */
 
 import { TENOR_TO_SECONDS, type Tenor } from './PricingService';
@@ -16,4 +20,4 @@ export const tenorToSeconds = (tenor: string): number => {
 };
 
 export const isSupportedTenor = (tenor: string): tenor is Tenor =>
-  ['30s', '1m', '5m', '15m', '1h'].includes(tenor);
+  ['30s', '1m', '2m', '3m'].includes(tenor);

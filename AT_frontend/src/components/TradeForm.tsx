@@ -30,7 +30,7 @@ export interface TradeFormProps {
  * the Risk → Win line below, which updates as the trader taps.
  */
 const STRIKE_OFFSETS = [5, 10, 25, 50] as const;
-const TENORS: Tenor[] = ['30s', '1m', '5m', '15m'];
+const TENORS: Tenor[] = ['30s', '1m', '2m', '3m'];
 const STAKE_MIN = 1;
 const STAKE_MAX = 100;
 
