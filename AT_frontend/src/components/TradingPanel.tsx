@@ -54,9 +54,9 @@ const Header = styled.header`
 `;
 
 /**
- * Brand lockup: square Foxify logo + 'Micro Options' wordmark.
+ * Brand lockup: square Atticus logo + 'Micro Options' wordmark.
  * Logo runs at 28px on phones / 32px on desktop with a fixed aspect
- * ratio (the source asset is 180x180 RGBA).
+ * ratio (the source asset is 180x180 JPEG).
  */
 const BrandLockup = styled.div`
   display: flex;
@@ -699,8 +699,8 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
   return (
     <TradingContainer>
       <Header>
-        <BrandLockup aria-label="Foxify Micro Options">
-          <img src="/images/foxify-logo.png" alt="Foxify" />
+        <BrandLockup aria-label="Atticus Micro Options">
+          <img src="/images/atticus-logo.jpg" alt="Atticus" />
           <span className="wordmark">Micro Options</span>
         </BrandLockup>
         <BalancePill />
