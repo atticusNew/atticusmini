@@ -9,6 +9,7 @@ import { getPartnerExchange } from './partner';
 import { realizedVolatility } from './pricing/realizedVolatility';
 import { pricingService, type Tenor } from './pricing/PricingService';
 import { isSupportedTenor } from './pricing/tenor';
+import { fetchFirstAvailable, type PriceTick } from './feed/restSources';
 
 export interface PriceData {
   current: number;
@@ -52,8 +53,21 @@ export class OffChainPricingEngine {
   private reconnectDelay: number = 1000;
   private placeSequence = 0;
   private settleSequence = 0;
+  private restPollTimer: ReturnType<typeof setInterval> | null = null;
+  private restInFlight = false;
+  private lastTickAt = 0;
+  private currentSource = 'connecting';
+  private isDisposed = false;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
+    // Skip network setup in headless test runs so the test runner doesn't
+    // leak timers + sockets. The engine is only useful in a browser.
+    if (typeof window === 'undefined') return;
+
+    // REST polling supervises the chart so the user always sees a price
+    // (even when the WebSocket is blocked or the venue is in maintenance).
+    this.startRestPolling();
     this.connectToPriceFeed();
   }
 
@@ -62,8 +76,8 @@ export class OffChainPricingEngine {
    * Using Coinbase WebSocket for live Bitcoin prices
    */
   private connectToPriceFeed(): void {
+    if (this.isDisposed) return;
     try {
-      
       this.wsConnection = new WebSocket('wss://ws-feed.exchange.coinbase.com');
       
       this.wsConnection.onopen = () => {
@@ -107,57 +121,91 @@ export class OffChainPricingEngine {
   }
 
   /**
-   * ✅ HANDLE PRICE UPDATES
-   * Process real-time price data and notify listeners
+   * Coinbase WS ticker payload → normalized tick.
    */
   private handlePriceUpdate(data: any): void {
-    const currentPrice = parseFloat(data.price);
-    
-    if (currentPrice > 0) {
-      const timestamp = Date.now();
-      const previousPrice = this.currentPrice;
-      this.currentPrice = currentPrice;
+    const price = parseFloat(data.price);
+    if (!isFinite(price) || price <= 0) return;
+    this.applyTick({
+      price,
+      source: 'coinbase_websocket',
+      high24h: parseFloat(data.high_24h || data.price),
+      low24h: parseFloat(data.low_24h || data.price),
+    });
+  }
 
-      realizedVolatility.observe(currentPrice, timestamp);
+  /**
+   * Single emit path: WS handler + REST polling both call this with a
+   * normalized tick. Notifies every listener and records into the
+   * price-history buffer used by the chart.
+   */
+  private applyTick(tick: PriceTick): void {
+    const timestamp = Date.now();
+    const previousPrice = this.currentPrice;
+    this.currentPrice = tick.price;
+    this.lastTickAt = timestamp;
+    this.currentSource = tick.source;
 
-      this.priceHistory.push({ timestamp, price: currentPrice });
-      
-      // Keep only last 1000 prices to prevent memory issues
-      if (this.priceHistory.length > 1000) {
-        this.priceHistory = this.priceHistory.slice(-1000);
-      }
-      
-      const priceChange = {
-        amount: previousPrice > 0 ? currentPrice - previousPrice : 0,
-        percentage: previousPrice > 0 ? ((currentPrice - previousPrice) / previousPrice) * 100 : 0
-      };
+    realizedVolatility.observe(tick.price, timestamp);
 
-      const priceData: PriceData = {
-        current: currentPrice,
-        price: currentPrice,
-        timestamp,
-        isValid: true,
-        change: priceChange,
-        source: 'coinbase_websocket',
-        volume: parseFloat(data.last_size || '0'),
-        high: parseFloat(data.high_24h || currentPrice.toString()),
-        low: parseFloat(data.low_24h || currentPrice.toString())
-      };
-
-      // Notify all listeners
-      this.listeners.forEach(callback => {
-        try {
-          callback(priceData);
-        } catch (error) {
-          console.error('❌ Error in price update callback:', error);
-        }
-      });
-
-      // Log significant price changes
-      const priceDifference = Math.abs(currentPrice - previousPrice);
-      if (priceDifference >= 0.01) {
-      }
+    this.priceHistory.push({ timestamp, price: tick.price });
+    if (this.priceHistory.length > 1000) {
+      this.priceHistory = this.priceHistory.slice(-1000);
     }
+
+    const change = previousPrice > 0
+      ? {
+          amount: tick.price - previousPrice,
+          percentage: ((tick.price - previousPrice) / previousPrice) * 100,
+        }
+      : { amount: 0, percentage: 0 };
+
+    const priceData: PriceData = {
+      current: tick.price,
+      price: tick.price,
+      timestamp,
+      isValid: true,
+      change,
+      source: tick.source,
+      volume: 0,
+      high: tick.high24h || tick.price,
+      low: tick.low24h || tick.price,
+    };
+
+    this.listeners.forEach(callback => {
+      try {
+        callback(priceData);
+      } catch (error) {
+        console.error('listener callback failed:', error);
+      }
+    });
+  }
+
+  /**
+   * Polls a chain of REST endpoints (Coinbase → Kraken → Binance.us).
+   * Runs every ~1.5s but skips when the WebSocket has emitted within the
+   * last 4s (so a healthy WS connection still drives the chart).
+   */
+  private startRestPolling(): void {
+    if (this.restPollTimer) return;
+    const tick = async () => {
+      if (this.restInFlight) return;
+      // Bail if disconnect() ran while this closure was queued
+      if (!this.restPollTimer) return;
+      const wsFresh = this.isConnected && Date.now() - this.lastTickAt < 4_000;
+      if (wsFresh) return;
+      this.restInFlight = true;
+      try {
+        const next = await fetchFirstAvailable();
+        if (next && this.restPollTimer) this.applyTick(next);
+      } finally {
+        this.restInFlight = false;
+      }
+    };
+    // Steady-state polling every 1.5s. First tick fires after ~1.5s; if a
+    // faster first paint matters, the WebSocket connection (started in
+    // parallel) usually beats it.
+    this.restPollTimer = setInterval(tick, 1_500);
   }
 
   /**
@@ -165,17 +213,17 @@ export class OffChainPricingEngine {
    * Automatic reconnection with exponential backoff
    */
   private handleReconnect(): void {
-    if (this.reconnectAttempts < this.maxReconnectAttempts) {
-      this.reconnectAttempts++;
-      const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-      
-      
-      setTimeout(() => {
-        this.connectToPriceFeed();
-      }, delay);
-    } else {
-      console.error('❌ Max reconnection attempts reached. Price feed unavailable.');
+    if (this.isDisposed) return;
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      // REST polling continues regardless, so the chart still gets prices.
+      return;
     }
+    this.reconnectAttempts++;
+    const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      this.connectToPriceFeed();
+    }, delay);
   }
 
   /**
@@ -454,11 +502,17 @@ export class OffChainPricingEngine {
   }
 
   /**
-   * ✅ GET CONNECTION STATUS
-   * Check if price feed is connected
+   * Connection status from the consumer's perspective: true when *any*
+   * source (WebSocket or REST) has emitted a tick within the last 5 s.
+   * The chart uses this to decide whether to render the "offline" badge.
    */
   public isPriceFeedConnected(): boolean {
-    return this.isConnected;
+    return Date.now() - this.lastTickAt < 5_000;
+  }
+
+  /** Name of the source that emitted the most recent tick. */
+  public getActiveSource(): string {
+    return this.currentSource;
   }
 
   /**
@@ -495,6 +549,15 @@ export class OffChainPricingEngine {
       this.wsConnection.close();
       this.wsConnection = null;
     }
+    if (this.restPollTimer) {
+      clearInterval(this.restPollTimer);
+      this.restPollTimer = null;
+    }
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    this.isDisposed = true;
     this.isConnected = false;
     this.listeners = [];
   }
