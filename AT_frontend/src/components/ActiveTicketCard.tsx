@@ -16,6 +16,7 @@ import { getPartnerExchange, type PartnerTicket } from '../services/partner';
 import { tenorToSeconds } from '../services/pricing/tenor';
 import { toastSoldBack } from './tradeToasts';
 import { FormRow, FormRowLabel, FormRowControl } from '../ui/primitives';
+import { trackTradeError, trackTradeSellback } from '../utils/analytics';
 
 interface ActiveTicketCardProps {
   ticketId: number;
@@ -26,6 +27,7 @@ interface ActiveTicketCardProps {
   tenor: string;
   stake: number;
   potentialPayout: number;
+  isDemoMode?: boolean;
   onSold: () => void;
 }
 
@@ -140,7 +142,7 @@ const formatRemaining = (s: number): string => {
 export const ActiveTicketCard: React.FC<ActiveTicketCardProps> = props => {
   const {
     ticketId, spotUSD, optionType, strikePrice, entryPrice: _entryPrice, tenor,
-    stake: _stake, potentialPayout, onSold,
+    stake: _stake, potentialPayout, isDemoMode = false, onSold,
   } = props;
 
   const [ticket, setTicket] = useState<PartnerTicket | null>(null);
@@ -194,7 +196,18 @@ export const ActiveTicketCard: React.FC<ActiveTicketCardProps> = props => {
       });
       if ('ok' in result) {
         toastSoldBack({ refund, pnl });
+        trackTradeSellback({
+          ticket_id: ticketId,
+          refund_usd: refund,
+          demo_mode: isDemoMode,
+        });
         onSold();
+      } else if ('err' in result) {
+        trackTradeError({
+          stage: 'sellback',
+          message: result.err,
+          demo_mode: isDemoMode,
+        });
       }
     } finally {
       setSubmitting(false);

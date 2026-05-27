@@ -6,6 +6,7 @@ import { ledgerService } from '../services/ledger/LedgerService';
 import type { TraderLedgerEntry } from '../services/ledger/LedgerService';
 import { mockPartnerExchangeAdapter } from '../services/partner';
 import { Card } from '../ui/primitives';
+import { trackDemoReset } from '../utils/analytics';
 // `mockPartnerExchangeAdapter` retained for the partner-name display; reset is
 // handled by `resetPaperBalance` so session P&L resets too.
 
@@ -180,6 +181,7 @@ export const AccountScreen: React.FC<AccountScreenProps> = ({ onLogout, onReset 
 
   const handleReset = async () => {
     await resetPaperBalance();
+    trackDemoReset();
     onReset();
   };
 

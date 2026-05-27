@@ -6,4 +6,10 @@ import { Pill } from '../ui/primitives';
  * yellow strip from PR #12 — same intent (mark this build as paper-only)
  * with far less vertical real estate.
  */
-export const DemoPill: React.FC = () => <Pill tone="demo">Demo</Pill>;
+const DEMO_TOOLTIP = 'Paper book · no real trades · no real money';
+
+export const DemoPill: React.FC = () => (
+  <Pill tone="demo" title={DEMO_TOOLTIP}>
+    Demo
+  </Pill>
+);

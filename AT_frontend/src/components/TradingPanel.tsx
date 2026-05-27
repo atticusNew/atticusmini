@@ -7,6 +7,12 @@ import { useFirstTradeHint } from '../hooks/useFirstTradeHint';
 import { PriceChart } from './PriceChart';
 import { CountdownPill } from './CountdownPill';
 import { BalancePill } from './BalancePill';
+import { DemoPill } from './DemoPill';
+import {
+  trackTradeError,
+  trackTradeExecuted,
+  trackTradeSettled,
+} from '../utils/analytics';
 import { ActiveTicketCard } from './ActiveTicketCard';
 import {
   toastTradePlaced, toastTradeWon, toastTradeLost, toastTradeTie, toastTradeError,
@@ -50,6 +56,23 @@ const Header = styled.header`
 
   @media (min-width: 768px) {
     padding: 0.5rem 1.5rem; /* ✅ FIX: Reduced desktop padding */
+  }
+`;
+
+const HeaderActions = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+`;
+
+/** Demo marker in header — desktop only; mobile uses PaperBanner below chart. */
+const DesktopDemoMark = styled.div`
+  display: none;
+
+  @media (min-width: 768px) {
+    display: flex;
+    align-items: center;
   }
 `;
 
@@ -115,6 +138,10 @@ const PaperBanner = styled.div`
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--accent);
+
+  @media (min-width: 768px) {
+    display: none;
+  }
 `;
 
 const ChartSection = styled.div`
@@ -455,6 +482,14 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
         toastTradeLost({ loss: result.profit });
       }
 
+      trackTradeSettled({
+        outcome: result.outcome,
+        option_type: currentTradeData.type,
+        expiry: currentTradeData.expiry,
+        profit_usd: result.profit,
+        demo_mode: isDemoMode,
+      });
+
       setTradeState({
         isActive: false,
         isInProgress: false,
@@ -474,6 +509,7 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('❌ Auto-settlement failed:', errorMessage);
+      trackTradeError({ stage: 'settlement', message: errorMessage, demo_mode: isDemoMode });
       toastTradeError(`Settlement failed: ${errorMessage}`);
 
       setTradeState({
@@ -662,6 +698,13 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
       });
 
       toastTradePlaced({ direction: finalOptionType, stake: contracts, tenor: finalExpiry });
+      trackTradeExecuted({
+        option_type: finalOptionType,
+        expiry: finalExpiry,
+        contracts,
+        stake_usd: contracts,
+        demo_mode: isDemoMode,
+      });
       refreshBalance().catch(() => {});
       setActiveTab('trade');
       scrollChartIntoView();
@@ -670,6 +713,7 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('❌ Failed to start trade:', errorMessage);
+      trackTradeError({ stage: 'place', message: errorMessage, demo_mode: isDemoMode });
       toastTradeError(errorMessage);
       setTradeState({
         isActive: false,
@@ -703,24 +747,24 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
           <img src="/images/atticus-logo.jpg" alt="Atticus" />
           <span className="wordmark">Micro Options</span>
         </BrandLockup>
-        <BalancePill />
-        {/*
-          v4 header cleanup: dropped DemoPill, the 'Paper' label on
-          BalancePill, the Exit-demo button, and the global
-          CountdownPill (the active-ticket card has its own timer
-          right next to the trade). The PAPER banner under the chart
-          is the single demo-mode reminder.
-
-          The countdown timer is still wired up on TradingPanel
-          (handleAutoSettlement fires when it expires) — it just
-          no longer renders in the header.
-        */}
-        <CountdownPill
-          isActive={tradeState.isActive}
-          expiry={selectedExpiry}
-          onExpiry={handleAutoSettlement}
-          headless
-        />
+        <HeaderActions>
+          {isDemoMode && (
+            <DesktopDemoMark>
+              <DemoPill />
+            </DesktopDemoMark>
+          )}
+          <BalancePill />
+          {/*
+            Countdown timer stays wired for auto-settlement; headless
+            so the active-ticket card owns the visible timer.
+          */}
+          <CountdownPill
+            isActive={tradeState.isActive}
+            expiry={selectedExpiry}
+            onExpiry={handleAutoSettlement}
+            headless
+          />
+        </HeaderActions>
       </Header>
 
       <MainContent>
@@ -772,6 +816,7 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({ onLogout, isDemoMode
                         tenor={td.expiry}
                         stake={td.amount}
                         potentialPayout={td.amount * payoutMultiple}
+                        isDemoMode={isDemoMode}
                         onSold={() => {
                           setTradeState({
                             isActive: false, isInProgress: false, data: null,
