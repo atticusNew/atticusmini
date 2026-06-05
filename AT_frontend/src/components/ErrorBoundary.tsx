@@ -65,7 +65,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   override componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('🚨 Trading Platform Error:', error);
+    console.error('Trading app error:', error);
     console.error('Error Info:', errorInfo);
   }
 
@@ -83,7 +83,7 @@ export class ErrorBoundary extends Component<Props, State> {
         <ErrorContainer>
           <ErrorTitle>⚠️ Trading Error</ErrorTitle>
           <ErrorMessage>
-            Something went wrong with the trading platform. This could be due to:
+            Something went wrong with the app. This could be due to:
             <br />• Network connectivity issues
             <br />• Price feed disconnection  
             <br />• Backend service temporarily unavailable
