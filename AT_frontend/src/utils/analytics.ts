@@ -1,5 +1,6 @@
 /**
- * GA4 analytics — loaded only when VITE_GA_MEASUREMENT_ID is set (Render env).
+ * GA4 analytics — the production stream is also present in index.html so
+ * Google/Tag Assistant can detect it before the React bundle loads.
  */
 
 declare global {
@@ -9,13 +10,16 @@ declare global {
   }
 }
 
-const MEASUREMENT_ID = import.meta.env.VITE_GA_MEASUREMENT_ID?.trim();
+const DEFAULT_MEASUREMENT_ID = 'G-LQP8R2VEJ1';
+const MEASUREMENT_ID = import.meta.env.VITE_GA_MEASUREMENT_ID?.trim() || DEFAULT_MEASUREMENT_ID;
 
 let initialized = false;
 
 export function initAnalytics(): void {
-  if (initialized || !MEASUREMENT_ID || typeof window === 'undefined') return;
+  if (initialized || typeof window === 'undefined') return;
   initialized = true;
+
+  if (window.gtag) return;
 
   window.dataLayer = window.dataLayer ?? [];
   window.gtag = function gtag(...args: unknown[]) {
