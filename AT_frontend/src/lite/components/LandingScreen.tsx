@@ -1,5 +1,5 @@
 import React from 'react';
-import styled, { keyframes } from 'styled-components';
+import styled from 'styled-components';
 import { useLiteSession } from '../state/LiteSessionProvider';
 import { Screen, BigButton } from './ui';
 
@@ -9,105 +9,68 @@ const Body = styled.div`
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 22px;
-  padding: 32px 24px calc(40px + env(safe-area-inset-bottom));
+  gap: 14px;
+  padding: 32px 24px 16px;
   text-align: center;
 `;
 
-const float = keyframes`
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
-`;
-
-const Icon = styled.img`
-  width: 120px;
-  height: 120px;
-  object-fit: contain;
-  animation: ${float} 3.4s ease-in-out infinite;
-`;
-
 const Wordmark = styled.img`
-  width: min(72vw, 300px);
+  width: min(80vw, 340px);
   height: auto;
 `;
 
 const Tag = styled.p`
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 18px;
+  font-size: 17px;
   color: var(--text);
-  margin: 0;
-  line-height: 1.35;
-`;
-
-const Sub = styled.p`
-  color: var(--text-dim);
-  font-size: 14px;
-  font-weight: 500;
-  margin: 0;
-  max-width: 320px;
-  line-height: 1.5;
-`;
-
-const Steps = styled.div`
-  display: flex;
-  gap: 10px;
-  margin-top: 4px;
-  .step {
-    flex: 1;
-    background: var(--bg-elev);
-    border: 2px solid var(--border-strong);
-    border-radius: 14px;
-    padding: 12px 8px;
-    box-shadow: var(--shadow-hard);
-    display: flex; flex-direction: column; gap: 4px; align-items: center;
-  }
-  .emoji { font-size: 20px; }
-  .t { font-family: var(--font-display); font-weight: 700; font-size: 12px; color: var(--text); }
+  margin: 0 0 10px;
 `;
 
 const Actions = styled.div`
   width: 100%;
-  max-width: 360px;
+  max-width: 340px;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-top: 6px;
 `;
 
-const Foot = styled.p`
-  color: var(--text-muted);
-  font-size: 11px;
-  margin: 0;
-  max-width: 320px;
-  line-height: 1.4;
+const Footer = styled.footer`
+  padding: 14px 24px calc(20px + env(safe-area-inset-bottom));
+  text-align: center;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  .copy { font-size: 12px; font-weight: 700; color: var(--text-dim); }
+  .legal { font-size: 10px; color: var(--text-muted); line-height: 1.5; max-width: 360px; margin: 0 auto; }
+  a { color: var(--text-dim); text-decoration: underline; }
 `;
 
 export const LandingScreen: React.FC = () => {
-  const { start } = useLiteSession();
+  const { start, signUp } = useLiteSession();
+  const year = new Date().getFullYear();
+
   return (
     <Screen>
       <Body>
-        <Icon src="/images/bitmatch-icon.png" alt="bitMATCH" />
         <Wordmark src="/images/lite-logo.png" alt="bitMATCH" />
         <Tag>Swipe. Match. Trade.</Tag>
-        <Sub>Challenge a trader to a 30-second Bitcoin duel. Whoever profits the most wins the wager.</Sub>
-
-        <Steps>
-          <div className="step"><span className="emoji">👤</span><span className="t">Create profile</span></div>
-          <div className="step"><span className="emoji">🃏</span><span className="t">Find opponent</span></div>
-          <div className="step"><span className="emoji">📈</span><span className="t">Out-trade them</span></div>
-        </Steps>
-
         <Actions>
-          <BigButton onClick={start}>Play now</BigButton>
+          <BigButton onClick={signUp}>Sign up</BigButton>
+          <BigButton tone="ghost" onClick={start}>Sign in</BigButton>
+          <BigButton tone="ghost" onClick={start}>Try the demo</BigButton>
         </Actions>
-
-        <Foot>
-          Trade involves risk. For entertainment; play responsibly. Real-money
-          play requires identity verification and is unavailable where prohibited.
-        </Foot>
       </Body>
+
+      <Footer>
+        <div className="copy">© {year} bitMATCH</div>
+        <p className="legal">
+          For entertainment; play responsibly. Trading involves risk of loss.
+          Real-money play requires identity verification and is unavailable where
+          prohibited by law. All trademarks are property of their respective owners.
+        </p>
+      </Footer>
     </Screen>
   );
 };

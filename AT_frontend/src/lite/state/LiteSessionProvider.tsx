@@ -48,6 +48,7 @@ interface LiteSessionValue {
   match: MatchState | null;
 
   start: () => void;
+  signUp: () => void;
   completeOnboarding: (input: CreateProfileInput) => void;
   updateProfile: (patch: Partial<Pick<LiteProfile, 'name' | 'bio' | 'avatar'>>) => void;
   resetBalance: () => void;
@@ -90,6 +91,9 @@ export const LiteSessionProvider: React.FC<{ children: ReactNode }> = ({ childre
   const start = useCallback(() => {
     setScreen(loadProfile() ? 'lobby' : 'onboarding');
   }, []);
+
+  // Auth is partner-owned and not built yet; sign-up routes to profile creation.
+  const signUp = useCallback(() => setScreen('onboarding'), []);
 
   const completeOnboarding = useCallback((input: CreateProfileInput) => {
     const p = createProfile(input);
@@ -214,6 +218,7 @@ export const LiteSessionProvider: React.FC<{ children: ReactNode }> = ({ childre
       opponent,
       match,
       start,
+      signUp,
       completeOnboarding,
       updateProfile,
       resetBalance,
@@ -232,7 +237,7 @@ export const LiteSessionProvider: React.FC<{ children: ReactNode }> = ({ childre
     }),
     [
       screen, profile, balance, wagerUSD, amountUSD, deck, opponent, match,
-      start, completeOnboarding, updateProfile, resetBalance, signOut,
+      start, signUp, completeOnboarding, updateProfile, resetBalance, signOut,
       setWager, setAmount, deposit, goLobby, openSwipe,
       challenge, enterMatch, startSolo, setMatch, commitResult, rematch,
     ],
