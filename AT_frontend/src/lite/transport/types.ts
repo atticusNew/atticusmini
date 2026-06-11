@@ -34,12 +34,26 @@ export interface MatchmakeResult {
   opponent: { name: string; avatar: string };
 }
 
-/** Messages exchanged between the two paired clients during a duel. */
+/** Messages exchanged in a match room (peer↔peer, and relay→client). */
 export type RoomMessage =
+  // client → relay: identify which leg this socket is (authoritative relay).
+  | { t: 'join'; role: 'host' | 'guest' }
+  // peer ↔ peer (also interpreted by an authoritative relay).
   | { t: 'entry'; dir: Direction; entrySpot: number; at: number }
   | { t: 'sell'; spot: number; at: number }
   | { t: 'hello'; name: string; avatar: string }
-  | { t: 'bye' };
+  | { t: 'bye' }
+  // relay → client: authoritative settlement (per-recipient perspective).
+  | {
+      t: 'settle';
+      outcome: 'you' | 'opp' | 'push';
+      youPnlUSD: number;
+      oppPnlUSD: number;
+      youNetUSD: number;
+      wagerUSD: number;
+      finalSpot: number;
+      reason?: 'expiry' | 'forfeit';
+    };
 
 export interface Room {
   send(msg: RoomMessage): void;

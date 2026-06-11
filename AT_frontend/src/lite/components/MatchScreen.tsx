@@ -450,7 +450,7 @@ export const MatchScreen: React.FC = () => {
               aria-label="Bet BTC goes lower">▼ LOW</BigButton>
           </DirRow>
         ) : match.you.status === 'open' ? (
-          <BigButton tone="ghost" onClick={sellYou}
+          <BigButton tone="sell" onClick={sellYou}
             aria-label="Sell now and lock your current profit or loss">
             Sell now · lock {fmt(livePnlUSD(match.you, spot))}
           </BigButton>

@@ -11,9 +11,12 @@ import {
 } from '../services/matchEngine';
 import { chooseDirection } from '../services/botStrategy';
 import { haptics } from '../services/haptics';
-import type { Direction, MatchSide, MatchState } from '../types';
+import type { Direction, MatchResult, MatchSide, MatchState } from '../types';
 
 const DURATION_SEC = 30;
+// In relay (WS) mode the server sends the authoritative result; only settle
+// locally (cross-tab BroadcastChannel mode) if none arrives within this grace.
+const LOCAL_SETTLE_GRACE_MS = 1500;
 const YOU_COLOR = '#ffd23f';
 const OPP_COLOR = '#41d7ff';
 
@@ -116,7 +119,7 @@ export const P2PMatchScreen: React.FC = () => {
     !liveStartAt ? 'arming' : now < liveStartAt ? 'arming' : now < expiryAt ? 'live' : 'settled';
   const live = phase === 'live';
 
-  // Apply incoming peer messages (opponent entry / sell).
+  // Room: identify ourselves to the relay, then handle peer + authoritative msgs.
   useEffect(() => {
     if (!peer) return;
     const unsub = peer.room.subscribe(msg => {
@@ -126,10 +129,31 @@ export const P2PMatchScreen: React.FC = () => {
         setMatch({ ...m, opp: openSide(m.opp, msg.dir, msg.entrySpot, msg.at) });
       } else if (msg.t === 'sell' && m.opp.status === 'open') {
         setMatch({ ...m, opp: closeSide(m.opp, msg.spot, msg.at) });
+      } else if (msg.t === 'settle') {
+        if (settledRef.current) return;
+        settledRef.current = true;
+        const result: MatchResult = {
+          outcome: msg.outcome,
+          youPnlUSD: msg.youPnlUSD,
+          oppPnlUSD: msg.oppPnlUSD,
+          youNetUSD: msg.youNetUSD,
+          wagerUSD: msg.wagerUSD,
+          finalSpot: msg.finalSpot,
+        };
+        haptics.settle();
+        setMatch({
+          ...m,
+          phase: 'settled',
+          result,
+          you: { ...m.you, status: 'closed', realizedPnlUSD: msg.youPnlUSD },
+          opp: { ...m.opp, status: 'closed', realizedPnlUSD: msg.oppPnlUSD },
+        });
+        commitResult(result);
       }
     });
+    peer.room.send({ t: 'join', role: peer.info.role });
     return unsub;
-  }, [peer, setMatch]);
+  }, [peer, setMatch, commitResult]);
 
   // Capture price path during the live window.
   useEffect(() => {
@@ -153,18 +177,19 @@ export const P2PMatchScreen: React.FC = () => {
     }
   }, [now, liveStartAt, spot, chosenDir, peer, setMatch]);
 
-  // Settle at the shared expiry.
+  // Fallback settlement (cross-tab/no-relay): only if the authoritative relay
+  // result hasn't arrived shortly after expiry.
   useEffect(() => {
     const m = matchRef.current;
     if (!m || settledRef.current) return;
-    if (phase === 'settled' && liveStartAt > 0 && spot > 0) {
+    if (phase === 'settled' && liveStartAt > 0 && spot > 0 && now >= expiryAt + LOCAL_SETTLE_GRACE_MS) {
       settledRef.current = true;
       const settled = settleMatch(m, spot, now);
       haptics.settle();
       setMatch(settled);
       if (settled.result) commitResult(settled.result);
     }
-  }, [phase, liveStartAt, spot, now, setMatch, commitResult]);
+  }, [phase, liveStartAt, spot, now, expiryAt, setMatch, commitResult]);
 
   const sellYou = useCallback(() => {
     const m = matchRef.current;
@@ -282,7 +307,7 @@ export const P2PMatchScreen: React.FC = () => {
               style={chosenDir === 'down' ? undefined : { opacity: chosenDir ? 0.6 : 1 }}>▼ LOW</BigButton>
           </DirRow>
         ) : match.you.status === 'open' ? (
-          <BigButton tone="ghost" onClick={sellYou} aria-label="Sell now and lock your profit or loss">
+          <BigButton tone="sell" onClick={sellYou} aria-label="Sell now and lock your profit or loss">
             Sell now · lock {fmt(livePnlUSD(match.you, spot))}
           </BigButton>
         ) : (

@@ -151,7 +151,7 @@ export const TextArea = styled.textarea`
   &:focus { border-color: var(--accent); box-shadow: 3px 3px 0 var(--accent); }
 `;
 
-export const BigButton = styled.button<{ tone?: 'primary' | 'ghost' | 'up' | 'down' }>`
+export const BigButton = styled.button<{ tone?: 'primary' | 'ghost' | 'up' | 'down' | 'sell' }>`
   appearance: none;
   border: 2px solid var(--border-strong);
   border-radius: 16px;
@@ -173,6 +173,7 @@ export const BigButton = styled.button<{ tone?: 'primary' | 'ghost' | 'up' | 'do
   ${p => p.tone === 'ghost' && css`background: var(--bg-elev);`}
   ${p => p.tone === 'up' && css`background: var(--up); color: #fff;`}
   ${p => p.tone === 'down' && css`background: var(--down); color: #fff;`}
+  ${p => p.tone === 'sell' && css`background: var(--purple); color: #fff;`}
   ${p => (!p.tone || p.tone === 'primary') && css`background: var(--accent);`}
 
   &:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: 2px 2px 0 var(--border-strong); }
