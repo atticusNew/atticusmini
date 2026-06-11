@@ -4,6 +4,8 @@
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve } from 'node:path';
+import { attachMatchRelay } from './relay.mjs';
+import { registerPlayer, listPlayers } from './directory.mjs';
 
 const ROOT = resolve(process.cwd(), 'dist');
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
@@ -68,8 +70,52 @@ const send = async (res, status, path) => {
 
 const indexFallback = join(ROOT, 'index.html');
 
+const readJson = (req, max) =>
+  new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks = [];
+    req.on('data', c => {
+      size += c.length;
+      if (size > max) { reject(new Error('payload too large')); req.destroy(); return; }
+      chunks.push(c);
+    });
+    req.on('end', () => {
+      try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}')); }
+      catch (e) { reject(e); }
+    });
+    req.on('error', reject);
+  });
+
+const sendJson = (res, status, obj) => {
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+  res.end(JSON.stringify(obj));
+};
+
 const server = createServer(async (req, res) => {
   const url = req.url ?? '/';
+  const reqPath = (url.split('?')[0]) || '/';
+
+  // Player directory API (the swipe deck of real signed-up players).
+  if (reqPath === '/api/players') {
+    if (req.method === 'GET') {
+      let exclude = '';
+      try { exclude = new URL(req.url, 'http://localhost').searchParams.get('exclude') || ''; } catch { /* ignore */ }
+      sendJson(res, 200, { players: listPlayers(exclude, 30) });
+      return;
+    }
+    if (req.method === 'POST') {
+      try {
+        const card = await readJson(req, 400_000);
+        sendJson(res, 200, { ok: registerPlayer(card) });
+      } catch {
+        sendJson(res, 400, { ok: false });
+      }
+      return;
+    }
+    res.writeHead(405).end();
+    return;
+  }
+
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     res.writeHead(405).end();
     return;
@@ -100,6 +146,10 @@ const server = createServer(async (req, res) => {
   await send(res, 404);
 });
 
+// Attach the bitMATCH P2P relay (WebSocket) on the same origin:
+//   /matchmake  and  /room/:matchId
+attachMatchRelay(server);
+
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`atticusmini static server listening on :${PORT} (root=${ROOT})`);
+  console.log(`atticusmini static server + match relay listening on :${PORT} (root=${ROOT})`);
 });

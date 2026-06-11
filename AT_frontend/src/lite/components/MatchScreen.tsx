@@ -1,0 +1,413 @@
+import React, { useCallback, useEffect, useRef } from 'react';
+import styled, { keyframes } from 'styled-components';
+import { useLiteSession } from '../state/LiteSessionProvider';
+import { useSynchronizedPrice } from '../../hooks/useGlobalPriceFeed';
+import { pricingEngine } from '../../services/OffChainPricingEngine';
+import { useNow } from '../hooks/useNow';
+import { MatchChart, type StrikeMark } from './MatchChart';
+import { Scoreboard, YOU_COLOR, OPP_COLOR } from './Scoreboard';
+import { Screen, TopBar, Avatar, BigButton } from './ui';
+import {
+  bothClosed, closeSide, effectivePnlUSD, isExpired, livePnlUSD, openSide,
+  secondsRemaining, settleMatch,
+} from '../services/matchEngine';
+import { chooseDirection, shouldSell } from '../services/botStrategy';
+import { haptics } from '../services/haptics';
+import type { Direction, MatchState } from '../types';
+
+const ARM_SECONDS = 10;
+
+const Body = styled.div`
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px max(14px, env(safe-area-inset-left)) calc(18px + env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-right));
+  min-height: 0;
+`;
+
+const UserChip = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  .meta { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .uname {
+    font-family: var(--font-display); font-weight: 700; font-size: 18px; color: var(--text);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px; line-height: 1.1;
+  }
+  .ubal {
+    font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 700;
+    font-size: 12px; color: var(--text-dim);
+  }
+`;
+
+const TopTimer = styled.div<{ tone: 'normal' | 'warn' | 'critical' }>`
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid var(--border-strong);
+  box-shadow: var(--shadow-hard);
+  background: ${p => (p.tone === 'critical' ? 'var(--down)' : p.tone === 'warn' ? 'var(--accent)' : 'var(--up)')};
+  color: ${p => (p.tone === 'critical' ? '#fff' : '#140f28')};
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  line-height: 1;
+  .n { font-size: 26px; }
+  .u { font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.8; }
+  animation: ${p => (p.tone === 'critical' ? 'litePulse 0.55s ease-in-out infinite' : 'none')};
+`;
+
+const WagerPill = styled.div`
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--accent);
+  border: 2px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 5px 11px;
+  box-shadow: 2px 2px 0 var(--border-strong);
+  white-space: nowrap;
+  .lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.7; }
+`;
+
+const LockedCard = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--bg-elev);
+  border: 2px dashed var(--border-strong);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text-dim);
+  .badge {
+    font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+    color: #fff; background: var(--purple); border: 2px solid var(--border-strong);
+    border-radius: 999px; padding: 3px 9px;
+  }
+  .amt { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 800; font-size: 17px; }
+`;
+
+const TopLabel = styled.div`
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+`;
+
+const ChartFrame = styled.div`
+  position: relative;
+  flex: 1;
+  display: flex;
+  min-height: 0;
+`;
+
+const BtcTag = styled.div`
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(20, 15, 40, 0.78);
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(2px);
+  .lbl { font-family: var(--font-display); font-weight: 700; font-size: 11px; color: #c9b8ff; letter-spacing: 0.08em; }
+  .val { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 800; font-size: 16px; color: #fff; }
+`;
+
+const pulseRing = keyframes`
+  0% { transform: scale(0.92); }
+  50% { transform: scale(1.04); }
+  100% { transform: scale(0.92); }
+`;
+
+const ArmOverlay = styled.div`
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgba(20, 15, 40, 0.42);
+  border-radius: 18px;
+  pointer-events: none;
+`;
+
+const ArmRing = styled.div<{ crit: boolean }>`
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  border: 6px solid ${p => (p.crit ? 'var(--down)' : 'var(--accent)')};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20,15,40,0.5);
+  animation: ${pulseRing} 1s ease-in-out infinite;
+  .n { font-family: var(--font-display); font-weight: 700; font-size: 56px; color: #fff; -webkit-text-stroke: 1px var(--border-strong); }
+`;
+
+const ArmHint = styled.div`
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 19px;
+  color: #fff;
+  text-shadow: 0 2px 6px rgba(0,0,0,0.55);
+  letter-spacing: 0.02em;
+  text-align: center;
+`;
+
+const ArmSub = styled.div`
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #fff;
+  text-align: center;
+  text-shadow: 0 2px 6px rgba(0,0,0,0.6);
+  max-width: 280px;
+  b { font-weight: 800; }
+`;
+
+const Pot = styled.div`
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-dim);
+  .v { color: var(--text); font-weight: 800; }
+`;
+
+const DirRow = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+`;
+
+const fmt = (n: number): string => `${n >= 0 ? '+' : '−'}$${Math.abs(n).toFixed(2)}`;
+
+const recentReturn = (): number => {
+  const hist = pricingEngine.getPriceHistory(1);
+  if (hist.length < 2) return 0;
+  const last = hist[hist.length - 1]?.price ?? 0;
+  const ref = hist[Math.max(0, hist.length - 12)]?.price ?? 0;
+  return ref > 0 ? (last - ref) / ref : 0;
+};
+
+export const MatchScreen: React.FC = () => {
+  const { match, opponent, balance, setMatch, commitResult } = useLiteSession();
+  const { priceState } = useSynchronizedPrice();
+  const spot = priceState.current;
+  const live = match?.phase === 'live';
+  const now = useNow(120, true);
+
+  const seriesRef = useRef<Array<{ t: number; p: number }>>([]);
+  const settledRef = useRef(false);
+  const botDelayMsRef = useRef(0);
+  // Arming pick-clock start, keyed to the match so a re-match resets it.
+  const armRef = useRef<{ id: string; at: number }>({ id: '', at: 0 });
+  if (match && match.phase === 'arming' && armRef.current.id !== match.id) {
+    armRef.current = { id: match.id, at: Date.now() };
+  }
+
+  useEffect(() => {
+    if (live && spot > 0) {
+      seriesRef.current = [...seriesRef.current, { t: now, p: spot }].slice(-160);
+    }
+  }, [live, now, spot]);
+
+  const arm = useCallback(
+    (dir: Direction) => {
+      if (!match || match.phase !== 'arming' || spot <= 0) return;
+      const t = Date.now();
+      seriesRef.current = [{ t, p: spot }];
+      settledRef.current = false;
+      botDelayMsRef.current = 600 + Math.random() * 1800;
+      const you = openSide(match.you, dir, spot, t);
+      haptics.pick();
+      setMatch({ ...match, you, entrySpot: spot, startedAt: t, phase: 'live' });
+    },
+    [match, spot, setMatch],
+  );
+
+  // Auto-pick when the 5s arming clock runs out, so the round always starts.
+  useEffect(() => {
+    if (match?.phase === 'arming' && spot > 0 && armRef.current.id === match.id) {
+      if (now - armRef.current.at >= ARM_SECONDS * 1000) {
+        arm(chooseDirection(recentReturn(), 0.5));
+      }
+    }
+  }, [match, now, spot, arm]);
+
+  const sellYou = useCallback(() => {
+    if (!match || match.phase !== 'live') return;
+    haptics.sell();
+    setMatch({ ...match, you: closeSide(match.you, spot, Date.now()) });
+  }, [match, spot, setMatch]);
+
+  // Live loop: drive the bot + settle on expiry.
+  useEffect(() => {
+    if (!match || match.phase !== 'live' || spot <= 0 || settledRef.current) return;
+    let next = match;
+    const elapsedMs = match.startedAt != null ? now - match.startedAt : 0;
+
+    if (match.mode === 'pvp' && opponent && next.opp.status === 'idle' && elapsedMs >= botDelayMsRef.current) {
+      const od = chooseDirection(recentReturn(), opponent.skill);
+      next = { ...next, opp: openSide(next.opp, od, spot, now) };
+    }
+    if (match.mode === 'pvp' && opponent && next.opp.status === 'open') {
+      const sec = secondsRemaining(next, now);
+      if (shouldSell({ opponent, side: next.opp, spot, secondsRemaining: sec })) {
+        next = { ...next, opp: closeSide(next.opp, spot, now) };
+      }
+    }
+    if (isExpired(next, now) || bothClosedForMode(next)) {
+      settledRef.current = true;
+      const settled = settleMatch(next, spot, now);
+      haptics.settle();
+      setMatch(settled);
+      if (settled.result) commitResult(settled.result);
+      return;
+    }
+    if (next !== match) setMatch(next);
+  }, [match, now, spot, opponent, setMatch, commitResult]);
+
+  if (!match) {
+    return (
+      <Screen>
+        <TopBar><UserChip><span className="uname">Atticus Lite</span></UserChip></TopBar>
+        <Body><Pot>Setting up…</Pot></Body>
+      </Screen>
+    );
+  }
+
+  const sec = live ? Math.ceil(secondsRemaining(match, now)) : match.durationSec;
+  const tone = sec <= 5 ? 'critical' : sec <= 10 ? 'warn' : 'normal';
+  const youPnl = effectivePnlUSD(match.you, spot);
+  const oppPnl = match.mode === 'pvp' ? effectivePnlUSD(match.opp, spot) : 0;
+  // Deadband so the lead doesn't flicker when PnLs are near-equal.
+  const LEAD_EPS = 0.05;
+  const leader: 'you' | 'opp' | null = match.mode === 'solo'
+    ? (youPnl > LEAD_EPS ? 'you' : null)
+    : (Math.abs(youPnl - oppPnl) <= LEAD_EPS ? null : (youPnl > oppPnl ? 'you' : 'opp'));
+  const youLead = live && leader === 'you';
+  const oppLead = live && leader === 'opp';
+
+  const strikes: StrikeMark[] = [];
+  if (match.you.direction && match.you.strikeUSD && match.you.entrySpot && match.you.entryAt) {
+    strikes.push({ price: match.you.strikeUSD, entrySpot: match.you.entrySpot, entryAt: match.you.entryAt, direction: match.you.direction, label: 'YOU', you: true });
+  }
+  if (match.mode === 'pvp' && match.opp.direction && match.opp.strikeUSD && match.opp.entrySpot && match.opp.entryAt) {
+    strikes.push({ price: match.opp.strikeUSD, entrySpot: match.opp.entrySpot, entryAt: match.opp.entryAt, direction: match.opp.direction, label: match.opp.name, you: false });
+  }
+
+  const chartSeries = live
+    ? seriesRef.current
+    : pricingEngine.getPriceHistory(0.6).map(h => ({ t: h.timestamp, p: h.price }));
+
+  const armRemaining = Math.max(0, Math.ceil(ARM_SECONDS - (now - armRef.current.at) / 1000));
+
+  return (
+    <Screen>
+      <TopBar>
+        <UserChip>
+          <Avatar src={match.you.avatar} size={36} />
+          <div className="meta">
+            <span className="uname">{match.you.name}</span>
+            <span className="ubal">${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          </div>
+        </UserChip>
+        {live
+          ? <TopTimer tone={tone}><span className="n">{sec}</span><span className="u">sec</span></TopTimer>
+          : <TopLabel>{match.phase === 'arming' ? 'Get ready' : ''}</TopLabel>}
+        {match.mode === 'pvp'
+          ? <WagerPill><span className="lbl">Wager </span>${match.wagerUSD}</WagerPill>
+          : <WagerPill>Solo</WagerPill>}
+      </TopBar>
+
+      <Body>
+        <ChartFrame>
+          {spot > 0 && (
+            <BtcTag>
+              <span className="lbl">BTC</span>
+              <span className="val">${spot.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
+            </BtcTag>
+          )}
+          <MatchChart
+            series={chartSeries}
+            now={now}
+            live={live}
+            windowStart={match.startedAt}
+            durationSec={match.durationSec}
+            spot={spot}
+            strikes={strikes}
+          />
+          {match.phase === 'arming' && (
+            <ArmOverlay>
+              <ArmHint>Will BTC go up or down?</ArmHint>
+              <ArmRing crit={armRemaining <= 3}>
+                <span className="n">{armRemaining}</span>
+              </ArmRing>
+              <ArmSub>
+                {spot > 0
+                  ? <>Tap <b style={{ color: 'var(--up)' }}>HIGH</b> or <b style={{ color: 'var(--down)' }}>LOW</b> below to lock your entry.<br />Most profit after 30s wins{match.mode === 'pvp' ? ' the wager.' : '.'}</>
+                  : 'Waiting for the live price…'}
+              </ArmSub>
+            </ArmOverlay>
+          )}
+        </ChartFrame>
+
+        <Scoreboard
+          you={{ name: match.you.name, direction: match.you.direction, pnl: youPnl, lead: youLead, color: YOU_COLOR, isYou: true }}
+          opp={match.mode === 'pvp'
+            ? { name: match.opp.name, direction: match.opp.direction, pnl: oppPnl, lead: oppLead, color: OPP_COLOR, isYou: false }
+            : { name: 'Solo', direction: null, pnl: 0, lead: false, color: OPP_COLOR, isYou: false, placeholder: 'beat $0' }}
+        />
+
+        {match.phase === 'arming' ? (
+          <DirRow>
+            <BigButton tone="up" disabled={spot <= 0} onClick={() => arm('up')}
+              aria-label="Bet BTC goes higher">▲ HIGH</BigButton>
+            <BigButton tone="down" disabled={spot <= 0} onClick={() => arm('down')}
+              aria-label="Bet BTC goes lower">▼ LOW</BigButton>
+          </DirRow>
+        ) : match.you.status === 'open' ? (
+          <BigButton tone="sell" onClick={sellYou}
+            aria-label="Sell now and lock your current profit or loss">
+            Sell now · lock {fmt(livePnlUSD(match.you, spot))}
+          </BigButton>
+        ) : (
+          <LockedCard>
+            <span className="badge">Locked</span>
+            <span>You banked</span>
+            <span className="amt" style={{ color: (match.you.realizedPnlUSD ?? 0) >= 0 ? 'var(--up)' : 'var(--down)' }}>
+              {fmt(match.you.realizedPnlUSD ?? 0)}
+            </span>
+          </LockedCard>
+        )}
+      </Body>
+    </Screen>
+  );
+};
+
+/** Solo only needs your side closed; PvP needs both. */
+function bothClosedForMode(match: MatchState): boolean {
+  if (match.mode === 'solo') return match.you.status === 'closed';
+  return bothClosed(match);
+}
