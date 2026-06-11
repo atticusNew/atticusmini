@@ -46,6 +46,8 @@ export interface Opponent {
   bio: string;
   avatar: string;
   stats: ProfileStats;
+  /** The wager this player prefers (shown on their card). */
+  wager: number;
   /**
    * Hidden skill knob (0..1) driving the bot during a match. Never shown
    * to the trader; matchmaking can use it to keep duels competitive.

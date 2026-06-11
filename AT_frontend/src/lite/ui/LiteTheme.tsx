@@ -121,13 +121,17 @@ export const LiteTheme: React.FC = () => {
       document.head.appendChild(link);
     }
 
-    // bitMATCH favicon + tab title — scoped to the Lite route so the main
-    // app's favicon/title are unaffected (route changes trigger a full load).
-    const icon = (document.querySelector("link[rel~='icon']") as HTMLLinkElement | null)
-      ?? Object.assign(document.createElement('link'), { rel: 'icon' });
-    if (!icon.parentNode) document.head.appendChild(icon);
+    // bitMATCH favicon + tab title — scoped to the Lite route so the main app's
+    // favicon/title are unaffected (route changes trigger a full load). Remove
+    // any existing icon links (the Atticus ones) so the bM circle wins.
+    document
+      .querySelectorAll("link[rel~='icon'], link[rel='shortcut icon'], link[rel='apple-touch-icon']")
+      .forEach(el => el.parentNode?.removeChild(el));
+    const icon = document.createElement('link');
+    icon.rel = 'icon';
     icon.type = 'image/png';
     icon.href = '/images/bitmatch-icon.png';
+    document.head.appendChild(icon);
     document.title = 'bitMATCH';
   }, []);
 

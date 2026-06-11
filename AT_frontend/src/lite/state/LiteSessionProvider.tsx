@@ -175,10 +175,10 @@ export const LiteSessionProvider: React.FC<{ children: ReactNode }> = ({ childre
     setScreen('lobby');
   }, [closePeer]);
 
-  // Keep the player's card in the production directory so others can find them.
+  // Keep the player's card (incl. preferred wager) in the production directory.
   useEffect(() => {
-    if (profile) registerCard(profile);
-  }, [profile]);
+    if (profile) registerCard(profile, wagerUSD);
+  }, [profile, wagerUSD]);
 
   const openSwipe = useCallback(() => {
     setDeck(drawOpponents()); // immediate demo roster so the deck isn't empty

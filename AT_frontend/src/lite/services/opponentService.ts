@@ -24,12 +24,12 @@ const avatar = (initials: string, bg: string): string => {
 };
 
 const ROSTER: Opponent[] = [
-  { id: 'op-willdro', name: 'Willdro', bio: 'Scalps the wicks. Never folds.', avatar: avatar('W', '#f5c344'), stats: { streak: 4, wins: 38, losses: 21 }, skill: 0.72 },
-  { id: 'op-singdoo', name: 'SingDoo', bio: '30 seconds is all I need.', avatar: avatar('SD', '#1bc47d'), stats: { streak: -2, wins: 12, losses: 15 }, skill: 0.4 },
-  { id: 'op-nova', name: 'Nova', bio: 'Momentum or nothing.', avatar: avatar('N', '#ff5d6c'), stats: { streak: 7, wins: 61, losses: 33 }, skill: 0.83 },
-  { id: 'op-kato', name: 'Kato', bio: 'Buy the dip, sell the rip.', avatar: avatar('K', '#5b8def'), stats: { streak: 1, wins: 22, losses: 19 }, skill: 0.55 },
-  { id: 'op-mina', name: 'Mina', bio: 'Patient. Then ruthless.', avatar: avatar('M', '#c77dff'), stats: { streak: 3, wins: 44, losses: 40 }, skill: 0.6 },
-  { id: 'op-rook', name: 'Rook', bio: 'New here. Easy money?', avatar: avatar('R', '#ffa14a'), stats: { streak: 0, wins: 3, losses: 4 }, skill: 0.25 },
+  { id: 'op-willdro', name: 'Willdro', bio: 'Scalps the wicks. Never folds.', avatar: avatar('W', '#f5c344'), stats: { streak: 4, wins: 38, losses: 21 }, wager: 50, skill: 0.72 },
+  { id: 'op-singdoo', name: 'SingDoo', bio: '30 seconds is all I need.', avatar: avatar('SD', '#1bc47d'), stats: { streak: -2, wins: 12, losses: 15 }, wager: 10, skill: 0.4 },
+  { id: 'op-nova', name: 'Nova', bio: 'Momentum or nothing.', avatar: avatar('N', '#ff5d6c'), stats: { streak: 7, wins: 61, losses: 33 }, wager: 100, skill: 0.83 },
+  { id: 'op-kato', name: 'Kato', bio: 'Buy the dip, sell the rip.', avatar: avatar('K', '#5b8def'), stats: { streak: 1, wins: 22, losses: 19 }, wager: 25, skill: 0.55 },
+  { id: 'op-mina', name: 'Mina', bio: 'Patient. Then ruthless.', avatar: avatar('M', '#c77dff'), stats: { streak: 3, wins: 44, losses: 40 }, wager: 25, skill: 0.6 },
+  { id: 'op-rook', name: 'Rook', bio: 'New here. Easy money?', avatar: avatar('R', '#ffa14a'), stats: { streak: 0, wins: 3, losses: 4 }, wager: 5, skill: 0.25 },
 ];
 
 /** Return a fresh shuffled deck of opponents to swipe through. */

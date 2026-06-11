@@ -36,7 +36,13 @@ const CardBody = styled.div`
   flex-direction: column;
   gap: 8px;
   background: var(--bg-elev);
+  .namerow { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .name { font-family: var(--font-display); font-size: 26px; font-weight: 700; }
+  .wager {
+    font-family: var(--font-display); font-weight: 700; font-size: 16px; color: var(--text);
+    background: var(--accent); border: 2px solid var(--border-strong); border-radius: 999px;
+    padding: 4px 12px; box-shadow: 2px 2px 0 var(--border-strong); white-space: nowrap;
+  }
   .bio { color: var(--text-dim); font-size: 14px; font-weight: 500; }
 `;
 
@@ -179,7 +185,10 @@ export const SwipeDeck: React.FC = () => {
               {isTop && <Stamp side="like" show={Math.max(0, Math.min(1, drag / THRESHOLD))}>CHALLENGE</Stamp>}
               {isTop && <Stamp side="nope" show={Math.max(0, Math.min(1, -drag / THRESHOLD))}>SKIP</Stamp>}
               <CardBody>
-                <span className="name">{op.name}</span>
+                <div className="namerow">
+                  <span className="name">{op.name}</span>
+                  <span className="wager">${op.wager}</span>
+                </div>
                 <span className="bio">{op.bio}</span>
                 <CardStats>
                   <span>streak <span className="v">{op.stats.streak}</span></span>

@@ -29,6 +29,7 @@ function sanitize(card) {
     name: clamp(card.name, 24),
     bio: clamp(card.bio, 120),
     avatar: clamp(card.avatar, MAX_AVATAR_CHARS),
+    wager: Math.max(1, Math.min(100, Number(card.wager) || 25)),
     stats: {
       wins: Math.max(0, Number(card?.stats?.wins) || 0),
       losses: Math.max(0, Number(card?.stats?.losses) || 0),
@@ -79,8 +80,9 @@ function pgBackend(url) {
     pool = new pg.Pool({ connectionString: url, max: 4 });
     await pool.query(`CREATE TABLE IF NOT EXISTS lite_players (
       id text PRIMARY KEY, name text, bio text, avatar text,
-      stats jsonb, last_seen bigint
+      wager int, stats jsonb, last_seen bigint
     )`);
+    await pool.query('ALTER TABLE lite_players ADD COLUMN IF NOT EXISTS wager int');
   };
   return {
     kind: 'postgres',
@@ -89,8 +91,8 @@ function pgBackend(url) {
         ready = ready || init();
         await ready;
         const cutoff = Date.now() - TTL_MS;
-        const { rows } = await pool.query('SELECT id,name,bio,avatar,stats,last_seen FROM lite_players WHERE last_seen >= $1', [cutoff]);
-        return rows.map(r => ({ card: { id: r.id, name: r.name, bio: r.bio, avatar: r.avatar, stats: r.stats }, lastSeen: Number(r.last_seen) }));
+        const { rows } = await pool.query('SELECT id,name,bio,avatar,wager,stats,last_seen FROM lite_players WHERE last_seen >= $1', [cutoff]);
+        return rows.map(r => ({ card: { id: r.id, name: r.name, bio: r.bio, avatar: r.avatar, wager: r.wager, stats: r.stats }, lastSeen: Number(r.last_seen) }));
       } catch { return []; }
     },
     scheduleSave() {
@@ -104,9 +106,9 @@ function pgBackend(url) {
           for (const v of cache.values()) {
             const c = v.card;
             await pool.query(
-              `INSERT INTO lite_players (id,name,bio,avatar,stats,last_seen) VALUES ($1,$2,$3,$4,$5,$6)
-               ON CONFLICT (id) DO UPDATE SET name=$2,bio=$3,avatar=$4,stats=$5,last_seen=$6`,
-              [c.id, c.name, c.bio, c.avatar, JSON.stringify(c.stats), v.lastSeen],
+              `INSERT INTO lite_players (id,name,bio,avatar,wager,stats,last_seen) VALUES ($1,$2,$3,$4,$5,$6,$7)
+               ON CONFLICT (id) DO UPDATE SET name=$2,bio=$3,avatar=$4,wager=$5,stats=$6,last_seen=$7`,
+              [c.id, c.name, c.bio, c.avatar, c.wager, JSON.stringify(c.stats), v.lastSeen],
             );
           }
         } catch { /* ignore; cache still serves */ }

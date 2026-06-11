@@ -14,6 +14,7 @@ interface PlayerCard {
   name: string;
   bio: string;
   avatar: string;
+  wager?: number;
   stats: { wins: number; losses: number; streak: number };
 }
 
@@ -25,7 +26,7 @@ const apiBase = (): string | null => {
   return '';
 };
 
-export const registerCard = async (profile: LiteProfile): Promise<void> => {
+export const registerCard = async (profile: LiteProfile, wager: number): Promise<void> => {
   const base = apiBase();
   if (base === null) return;
   try {
@@ -37,6 +38,7 @@ export const registerCard = async (profile: LiteProfile): Promise<void> => {
         name: profile.name,
         bio: profile.bio,
         avatar: profile.avatar,
+        wager,
         stats: profile.stats,
       }),
     });
@@ -51,6 +53,7 @@ export const cardToOpponent = (c: PlayerCard): Opponent => ({
   bio: c.bio,
   avatar: c.avatar,
   stats: { wins: c.stats.wins, losses: c.stats.losses, streak: c.stats.streak },
+  wager: Math.max(1, Math.min(100, Number(c.wager) || 25)),
   skill: 0.5,
 });
 

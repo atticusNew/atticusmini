@@ -5,6 +5,7 @@ import { useSynchronizedPrice } from '../../hooks/useGlobalPriceFeed';
 import { pricingEngine } from '../../services/OffChainPricingEngine';
 import { useNow } from '../hooks/useNow';
 import { MatchChart, type StrikeMark } from './MatchChart';
+import { Scoreboard, YOU_COLOR, OPP_COLOR } from './Scoreboard';
 import { Screen, TopBar, Avatar, BigButton } from './ui';
 import {
   bothClosed, closeSide, effectivePnlUSD, isExpired, livePnlUSD, openSide,
@@ -12,11 +13,9 @@ import {
 } from '../services/matchEngine';
 import { chooseDirection, shouldSell } from '../services/botStrategy';
 import { haptics } from '../services/haptics';
-import type { Direction, MatchSide, MatchState } from '../types';
+import type { Direction, MatchState } from '../types';
 
 const ARM_SECONDS = 10;
-const YOU_COLOR = '#ffd23f';
-const OPP_COLOR = '#41d7ff';
 
 const Body = styled.div`
   flex: 1;
@@ -41,44 +40,6 @@ const UserChip = styled.div`
     font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 700;
     font-size: 12px; color: var(--text-dim);
   }
-`;
-
-const ScoreBar = styled.div`
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 10px;
-`;
-
-const ScoreSide = styled.div<{ side: 'you' | 'opp'; lead: boolean }>`
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  padding: 10px 12px;
-  border-radius: 14px;
-  align-items: ${p => (p.side === 'opp' ? 'flex-end' : 'flex-start')};
-  background: var(--bg-elev);
-  border: 2px solid var(--border-strong);
-  /* Lead cue: accent fill ring + lift, smooth (no layout shift). */
-  box-shadow: ${p => (p.lead ? 'inset 0 0 0 3px var(--accent), var(--shadow-hard)' : '2px 2px 0 var(--border-strong)')};
-  transition: box-shadow 220ms ease;
-  .name {
-    display: flex; align-items: center; gap: 6px;
-    flex-direction: ${p => (p.side === 'opp' ? 'row-reverse' : 'row')};
-    font-family: var(--font-display); font-weight: 700; font-size: 14px; color: var(--text);
-    max-width: 100%; overflow: hidden; white-space: nowrap;
-  }
-  .dot { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--border-strong); flex-shrink: 0; }
-  .crown { width: 16px; text-align: center; flex-shrink: 0; }
-  .lbl { font-size: 9px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
-  .pnl { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 800; font-size: 23px; line-height: 1; }
-`;
-
-const Vs = styled.div`
-  font-family: var(--font-display);
-  font-weight: 700;
-  color: var(--text-dim);
-  font-size: 13px;
 `;
 
 const TopTimer = styled.div<{ tone: 'normal' | 'warn' | 'critical' }>`
@@ -362,23 +323,6 @@ export const MatchScreen: React.FC = () => {
 
   const armRemaining = Math.max(0, Math.ceil(ARM_SECONDS - (now - armRef.current.at) / 1000));
 
-  const renderSide = (side: MatchSide, who: 'you' | 'opp', pnl: number, lead: boolean, color: string, name: string) => {
-    const arrow = side.direction === 'up' ? '▲ ' : side.direction === 'down' ? '▼ ' : '';
-    return (
-      <ScoreSide side={who} lead={lead}>
-        <span className="name">
-          <span className="dot" style={{ background: color }} />
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</span>
-          <span className="crown">{lead ? '👑' : ''}</span>
-        </span>
-        <span className="lbl">{side.direction ? (side.direction === 'up' ? 'HIGH · P/L' : 'LOW · P/L') : 'profit/loss'}</span>
-        <span className="pnl" style={{ color: pnl >= 0 ? 'var(--up)' : 'var(--down)' }}>
-          {side.direction ? `${arrow}${fmt(pnl)}` : '—'}
-        </span>
-      </ScoreSide>
-    );
-  };
-
   return (
     <Screen>
       <TopBar>
@@ -429,18 +373,12 @@ export const MatchScreen: React.FC = () => {
           )}
         </ChartFrame>
 
-        <ScoreBar>
-          {renderSide(match.you, 'you', youPnl, youLead, YOU_COLOR, match.you.name)}
-          <Vs>VS</Vs>
-          {match.mode === 'pvp'
-            ? renderSide(match.opp, 'opp', oppPnl, oppLead, OPP_COLOR, match.opp.name)
-            : (
-              <ScoreSide side="opp" lead={false}>
-                <span className="name">Solo</span>
-                <span className="pnl" style={{ color: 'var(--text-dim)' }}>beat $0</span>
-              </ScoreSide>
-            )}
-        </ScoreBar>
+        <Scoreboard
+          you={{ name: match.you.name, direction: match.you.direction, pnl: youPnl, lead: youLead, color: YOU_COLOR, isYou: true }}
+          opp={match.mode === 'pvp'
+            ? { name: match.opp.name, direction: match.opp.direction, pnl: oppPnl, lead: oppLead, color: OPP_COLOR, isYou: false }
+            : { name: 'Solo', direction: null, pnl: 0, lead: false, color: OPP_COLOR, isYou: false, placeholder: 'beat $0' }}
+        />
 
         {match.phase === 'arming' ? (
           <DirRow>

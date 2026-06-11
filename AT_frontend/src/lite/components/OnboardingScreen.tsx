@@ -169,7 +169,7 @@ export const OnboardingScreen: React.FC = () => {
             })
           }
         >
-          {canSubmit ? 'Enter the arena →' : 'Add a name to continue'}
+          {canSubmit ? 'Start playing →' : 'Add a name to continue'}
         </BigButton>
       </ScreenBody>
     </Screen>
