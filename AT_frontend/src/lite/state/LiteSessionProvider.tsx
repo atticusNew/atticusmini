@@ -2,6 +2,7 @@ import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -22,6 +23,7 @@ import {
 } from '../services/profileService';
 import { liteWallet } from '../services/liteWallet';
 import { drawOpponents } from '../services/opponentService';
+import { registerCard, fetchPlayerCards } from '../services/directory';
 import type { MatchmakeResult, Room } from '../transport';
 import {
   clampAmount,
@@ -160,10 +162,21 @@ export const LiteSessionProvider: React.FC<{ children: ReactNode }> = ({ childre
     setScreen('lobby');
   }, [closePeer]);
 
+  // Keep the player's card in the production directory so others can find them.
+  useEffect(() => {
+    if (profile) registerCard(profile);
+  }, [profile]);
+
   const openSwipe = useCallback(() => {
-    setDeck(drawOpponents());
+    setDeck(drawOpponents()); // immediate demo roster so the deck isn't empty
     setScreen('swipe');
-  }, []);
+    const id = profile?.id ?? '';
+    fetchPlayerCards(id)
+      .then(real => {
+        if (real && real.length) setDeck([...real, ...drawOpponents()]);
+      })
+      .catch(() => {});
+  }, [profile]);
 
   const buildMatch = useCallback(
     (mode: 'pvp' | 'solo', opp: { name: string; avatar: string } | null): MatchState =>
