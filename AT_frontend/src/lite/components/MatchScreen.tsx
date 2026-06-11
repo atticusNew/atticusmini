@@ -5,7 +5,7 @@ import { useSynchronizedPrice } from '../../hooks/useGlobalPriceFeed';
 import { pricingEngine } from '../../services/OffChainPricingEngine';
 import { useNow } from '../hooks/useNow';
 import { MatchChart, type StrikeMark } from './MatchChart';
-import { Screen, TopBar, Brand, BigButton } from './ui';
+import { Screen, TopBar, Avatar, BigButton } from './ui';
 import {
   bothClosed, closeSide, effectivePnlUSD, isExpired, livePnlUSD, openSide,
   secondsRemaining, settleMatch,
@@ -24,6 +24,18 @@ const Body = styled.div`
   gap: 12px;
   padding: 12px 14px 18px;
   min-height: 0;
+`;
+
+const UserChip = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  .quit { cursor: pointer; font-size: 20px; font-weight: 700; color: var(--text); padding-right: 2px; }
+  .uname {
+    font-family: var(--font-display); font-weight: 700; font-size: 15px; color: var(--text);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px;
+  }
 `;
 
 const ScoreBar = styled.div`
@@ -228,7 +240,7 @@ export const MatchScreen: React.FC = () => {
   if (!match) {
     return (
       <Screen>
-        <TopBar><Brand><span>Atticus</span><span className="lite">Lite</span></Brand></TopBar>
+        <TopBar><UserChip><span className="uname">Atticus Lite</span></UserChip></TopBar>
         <Body><Pot>Setting up…</Pot></Body>
       </Screen>
     );
@@ -273,24 +285,15 @@ export const MatchScreen: React.FC = () => {
   return (
     <Screen>
       <TopBar>
-        <Brand><span onClick={goLobby} style={{ cursor: 'pointer' }}>← Quit</span></Brand>
+        <UserChip>
+          <span className="quit" onClick={goLobby}>←</span>
+          <Avatar src={match.you.avatar} size={30} />
+          <span className="uname">{match.you.name}</span>
+        </UserChip>
         <Pot>{match.mode === 'pvp' ? <>Wager <span className="v">${match.wagerUSD}</span></> : <>Solo</>}</Pot>
       </TopBar>
 
       <Body>
-        <ScoreBar>
-          {renderSide(match.you, 'you', youPnl, youLead, YOU_COLOR, match.you.name)}
-          {live ? <CenterClock tone={tone}>{sec}<span>s</span></CenterClock> : <Vs>VS</Vs>}
-          {match.mode === 'pvp'
-            ? renderSide(match.opp, 'opp', oppPnl, oppLead, OPP_COLOR, match.opp.name)
-            : (
-              <ScoreSide side="opp" lead={false}>
-                <span className="name">Solo</span>
-                <span className="pnl" style={{ color: 'var(--text-dim)' }}>beat $0</span>
-              </ScoreSide>
-            )}
-        </ScoreBar>
-
         <ChartFrame>
           <MatchChart
             series={chartSeries}
@@ -313,6 +316,19 @@ export const MatchScreen: React.FC = () => {
             </ArmOverlay>
           )}
         </ChartFrame>
+
+        <ScoreBar>
+          {renderSide(match.you, 'you', youPnl, youLead, YOU_COLOR, match.you.name)}
+          {live ? <CenterClock tone={tone}>{sec}<span>s</span></CenterClock> : <Vs>VS</Vs>}
+          {match.mode === 'pvp'
+            ? renderSide(match.opp, 'opp', oppPnl, oppLead, OPP_COLOR, match.opp.name)
+            : (
+              <ScoreSide side="opp" lead={false}>
+                <span className="name">Solo</span>
+                <span className="pnl" style={{ color: 'var(--text-dim)' }}>beat $0</span>
+              </ScoreSide>
+            )}
+        </ScoreBar>
 
         {match.phase === 'arming' ? (
           <DirRow>
