@@ -67,6 +67,13 @@ export const Brand = styled.div`
   }
 `;
 
+/** bitMATCH wordmark used in screen headers (top-left). */
+export const Logo = styled.img`
+  height: 28px;
+  width: auto;
+  display: block;
+`;
+
 export const BalanceTag = styled.div`
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;

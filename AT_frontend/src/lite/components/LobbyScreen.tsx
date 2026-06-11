@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import styled from 'styled-components';
 import { useLiteSession } from '../state/LiteSessionProvider';
 import {
-  Screen, ScreenBody, TopBar, Brand, BalanceTag, BigButton, Avatar, StatRow,
+  Screen, ScreenBody, TopBar, Logo, BalanceTag, BigButton, Avatar, StatRow,
 } from './ui';
 import {
   MAX_AMOUNT_USD, MAX_WAGER_USD, MIN_AMOUNT_USD, MIN_WAGER_USD,
@@ -118,11 +118,7 @@ export const LobbyScreen: React.FC = () => {
   return (
     <Screen>
       <TopBar>
-        <Brand>
-          <img src="/images/atticus-logo.jpg" alt="Atticus" />
-          <span>Atticus</span>
-          <span className="lite">Lite</span>
-        </Brand>
+        <Logo src="/images/lite-logo.png" alt="bitMATCH" />
         <BalanceTag>${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</BalanceTag>
       </TopBar>
 
@@ -178,7 +174,7 @@ export const LobbyScreen: React.FC = () => {
 
         <div style={{ flex: 1, minHeight: 8 }} />
 
-        <BigButton onClick={openSwipe}>🔥 Find an opponent</BigButton>
+        <BigButton onClick={openSwipe}>Find an opponent</BigButton>
         <BigButton tone="ghost" onClick={startSolo}>Solo practice</BigButton>
         <DepositLink
           onClick={() => { setDepositing(true); deposit(1000); setTimeout(() => setDepositing(false), 600); }}

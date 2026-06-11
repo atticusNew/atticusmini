@@ -1,7 +1,7 @@
 import React from 'react';
 import styled from 'styled-components';
 import { useLiteSession } from '../state/LiteSessionProvider';
-import { Screen, TopBar, Brand, BalanceTag, BigButton, Pop } from './ui';
+import { Screen, TopBar, Logo, BalanceTag, BigButton, Pop } from './ui';
 
 const Body = styled.div`
   flex: 1;
@@ -52,7 +52,7 @@ export const ResultScreen: React.FC = () => {
   if (!match || !result) {
     return (
       <Screen>
-        <TopBar><Brand><span>Atticus</span><span className="lite">Lite</span></Brand></TopBar>
+        <TopBar><Logo src="/images/lite-logo.png" alt="bitMATCH" /></TopBar>
         <Body><BigButton onClick={goLobby}>Back to lobby</BigButton></Body>
       </Screen>
     );
@@ -64,10 +64,7 @@ export const ResultScreen: React.FC = () => {
   return (
     <Screen>
       <TopBar>
-        <Brand>
-          <img src="/images/atticus-logo.jpg" alt="Atticus" />
-          <span>Atticus</span><span className="lite">Lite</span>
-        </Brand>
+        <Logo src="/images/lite-logo.png" alt="bitMATCH" />
         <BalanceTag>${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</BalanceTag>
       </TopBar>
 
@@ -97,7 +94,7 @@ export const ResultScreen: React.FC = () => {
         <BigButton onClick={rematch}>
           {match.mode === 'pvp' ? `Re-MATCH ${match.opp.name} ✓` : 'Trade again ✓'}
         </BigButton>
-        <BigButton tone="up" onClick={openSwipe}>🔥 Find new opponent</BigButton>
+        <BigButton tone="up" onClick={openSwipe}>Find new opponent</BigButton>
         <BigButton tone="ghost" onClick={goLobby}>Back to lobby</BigButton>
       </Body>
     </Screen>

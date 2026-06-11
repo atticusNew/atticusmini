@@ -118,16 +118,16 @@ export const MatchChart: React.FC<MatchChartProps> = ({
           {/* Subtle stock-chart grid: vertical (time) + horizontal (price) */}
           {vGrid.map((x, i) => (
             <line key={`v${i}`} x1={x} y1={PAD} x2={x} y2={H - PAD}
-              stroke="#ffffff" strokeOpacity={0.05} strokeWidth={1} />
+              stroke="#ffffff" strokeOpacity={0.12} strokeWidth={1} strokeDasharray="2 4" />
           ))}
           {gridLevels.map((p, i) => {
             const y = yOf(p);
             return (
               <g key={`h${i}`}>
                 <line x1={left} y1={y} x2={right} y2={y}
-                  stroke="#ffffff" strokeOpacity={0.07} strokeWidth={1} />
+                  stroke="#ffffff" strokeOpacity={0.15} strokeWidth={1} strokeDasharray="2 4" />
                 <text x={right - 2} y={y - 3} fontSize={9} textAnchor="end"
-                  fill="#ffffff" fillOpacity={0.32} style={{ fontFamily: 'var(--font-mono)' }}>
+                  fill="#ffffff" fillOpacity={0.45} style={{ fontFamily: 'var(--font-mono)' }}>
                   {fmtPrice(p)}
                 </text>
               </g>

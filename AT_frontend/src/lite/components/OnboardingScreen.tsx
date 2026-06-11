@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import styled from 'styled-components';
 import { useLiteSession } from '../state/LiteSessionProvider';
 import {
-  Screen, ScreenBody, TopBar, Brand, Title, Sub, Field, Input, TextArea, BigButton, Avatar,
+  Screen, ScreenBody, TopBar, Logo, Title, Sub, Field, Input, TextArea, BigButton, Avatar,
 } from './ui';
 import type { RegistrationMethod } from '../types';
 
@@ -76,11 +76,7 @@ export const OnboardingScreen: React.FC = () => {
   return (
     <Screen>
       <TopBar>
-        <Brand>
-          <img src="/images/atticus-logo.jpg" alt="Atticus" />
-          <span>Atticus</span>
-          <span className="lite">Lite</span>
-        </Brand>
+        <Logo src="/images/lite-logo.png" alt="bitMATCH" />
       </TopBar>
       <ScreenBody>
         <div>

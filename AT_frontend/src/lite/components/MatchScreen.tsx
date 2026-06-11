@@ -76,22 +76,59 @@ const Vs = styled.div`
 `;
 
 const TopTimer = styled.div<{ tone: 'normal' | 'warn' | 'critical' }>`
-  width: 50px;
-  height: 50px;
+  width: 58px;
+  height: 58px;
   border-radius: 50%;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: var(--bg-elev);
-  border: 3px solid ${p => (p.tone === 'critical' ? 'var(--down)' : p.tone === 'warn' ? 'var(--accent)' : 'var(--border-strong)')};
-  box-shadow: 2px 2px 0 var(--border-strong);
+  border: 3px solid var(--border-strong);
+  box-shadow: var(--shadow-hard);
+  background: ${p => (p.tone === 'critical' ? 'var(--down)' : p.tone === 'warn' ? 'var(--accent)' : 'var(--up)')};
+  color: ${p => (p.tone === 'critical' ? '#fff' : '#140f28')};
   font-family: var(--font-display);
   font-variant-numeric: tabular-nums;
   font-weight: 700;
-  font-size: 24px;
   line-height: 1;
-  color: ${p => (p.tone === 'critical' ? 'var(--down)' : p.tone === 'warn' ? 'var(--accent)' : 'var(--text)')};
-  animation: ${p => (p.tone === 'critical' ? 'litePulse 0.6s ease-in-out infinite' : 'none')};
+  .n { font-size: 26px; }
+  .u { font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.8; }
+  animation: ${p => (p.tone === 'critical' ? 'litePulse 0.55s ease-in-out infinite' : 'none')};
+`;
+
+const WagerPill = styled.div`
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--accent);
+  border: 2px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 5px 11px;
+  box-shadow: 2px 2px 0 var(--border-strong);
+  white-space: nowrap;
+  .lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.7; }
+`;
+
+const LockedCard = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--bg-elev);
+  border: 2px dashed var(--border-strong);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text-dim);
+  .badge {
+    font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+    color: #fff; background: var(--purple); border: 2px solid var(--border-strong);
+    border-radius: 999px; padding: 3px 9px;
+  }
+  .amt { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 800; font-size: 17px; }
 `;
 
 const TopLabel = styled.div`
@@ -310,9 +347,11 @@ export const MatchScreen: React.FC = () => {
           <span className="uname">{match.you.name}</span>
         </UserChip>
         {live
-          ? <TopTimer tone={tone}>{sec}</TopTimer>
+          ? <TopTimer tone={tone}><span className="n">{sec}</span><span className="u">sec</span></TopTimer>
           : <TopLabel>{match.phase === 'arming' ? 'Get ready' : ''}</TopLabel>}
-        <Pot>{match.mode === 'pvp' ? <>Wager <span className="v">${match.wagerUSD}</span></> : <>Solo</>}</Pot>
+        {match.mode === 'pvp'
+          ? <WagerPill><span className="lbl">Wager </span>${match.wagerUSD}</WagerPill>
+          : <WagerPill>Solo</WagerPill>}
       </TopBar>
 
       <Body>
@@ -362,7 +401,13 @@ export const MatchScreen: React.FC = () => {
             Sell now · lock {fmt(livePnlUSD(match.you, spot))}
           </BigButton>
         ) : (
-          <Pot>Locked at {fmt(match.you.realizedPnlUSD ?? 0)} — riding the clock…</Pot>
+          <LockedCard>
+            <span className="badge">Locked</span>
+            <span>You banked</span>
+            <span className="amt" style={{ color: (match.you.realizedPnlUSD ?? 0) >= 0 ? 'var(--up)' : 'var(--down)' }}>
+              {fmt(match.you.realizedPnlUSD ?? 0)}
+            </span>
+          </LockedCard>
         )}
       </Body>
     </Screen>

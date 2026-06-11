@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { useLiteSession } from '../state/LiteSessionProvider';
-import { Screen, TopBar, Brand, BalanceTag } from './ui';
+import { Screen, TopBar, Logo, BalanceTag } from './ui';
 import type { Opponent } from '../types';
 
 const DeckArea = styled.div`
@@ -141,9 +141,10 @@ export const SwipeDeck: React.FC = () => {
   return (
     <Screen>
       <TopBar>
-        <Brand>
-          <span onClick={goLobby} style={{ cursor: 'pointer' }}>← Back</span>
-        </Brand>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span onClick={goLobby} style={{ cursor: 'pointer', fontSize: 20, fontWeight: 700 }}>←</span>
+          <Logo src="/images/lite-logo.png" alt="bitMATCH" />
+        </div>
         <BalanceTag>${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</BalanceTag>
       </TopBar>
 
