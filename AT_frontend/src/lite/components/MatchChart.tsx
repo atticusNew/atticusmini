@@ -98,7 +98,8 @@ export const MatchChart: React.FC<MatchChartProps> = ({
     ? `${pathPts[0]!.x.toFixed(1)},${(H - PAD).toFixed(1)} ${linePts} ${pathPts[pathPts.length - 1]!.x.toFixed(1)},${(H - PAD).toFixed(1)}`
     : '';
 
-  const gridLevels = [0.25, 0.5, 0.75].map(f => yLo + (yHi - yLo) * f);
+  const gridLevels = [0.18, 0.41, 0.64, 0.87].map(f => yLo + (yHi - yLo) * f);
+  const vGrid = [0.2, 0.4, 0.6, 0.8].map(f => left + innerW * f);
 
   return (
     <Wrap ref={ref}>
@@ -114,14 +115,24 @@ export const MatchChart: React.FC<MatchChartProps> = ({
           {/* Legibility veil over the photo */}
           <rect x={0} y={0} width={W} height={H} fill="#0b0d18" opacity={0.32} />
 
-          {/* Faint price gridlines */}
-          {gridLevels.map((p, i) => (
-            <line key={i} x1={left} y1={yOf(p)} x2={right} y2={yOf(p)}
-              stroke="#ffffff" strokeOpacity={0.09} strokeWidth={1} />
+          {/* Subtle stock-chart grid: vertical (time) + horizontal (price) */}
+          {vGrid.map((x, i) => (
+            <line key={`v${i}`} x1={x} y1={PAD} x2={x} y2={H - PAD}
+              stroke="#ffffff" strokeOpacity={0.05} strokeWidth={1} />
           ))}
-
-          {/* Expiry "time line" at the right edge */}
-          {live && <line x1={right} y1={0} x2={right} y2={H} stroke="var(--down)" strokeWidth={2.5} strokeOpacity={0.85} />}
+          {gridLevels.map((p, i) => {
+            const y = yOf(p);
+            return (
+              <g key={`h${i}`}>
+                <line x1={left} y1={y} x2={right} y2={y}
+                  stroke="#ffffff" strokeOpacity={0.07} strokeWidth={1} />
+                <text x={right - 2} y={y - 3} fontSize={9} textAnchor="end"
+                  fill="#ffffff" fillOpacity={0.32} style={{ fontFamily: 'var(--font-mono)' }}>
+                  {fmtPrice(p)}
+                </text>
+              </g>
+            );
+          })}
 
           {/* Per-trader entry markers: dot ON the line + horizontal line to expiry */}
           {live && strikes.map((s, i) => {

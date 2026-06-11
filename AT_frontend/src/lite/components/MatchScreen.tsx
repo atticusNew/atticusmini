@@ -76,14 +76,22 @@ const Vs = styled.div`
 `;
 
 const TopTimer = styled.div<{ tone: 'normal' | 'warn' | 'critical' }>`
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-elev);
+  border: 3px solid ${p => (p.tone === 'critical' ? 'var(--down)' : p.tone === 'warn' ? 'var(--accent)' : 'var(--border-strong)')};
+  box-shadow: 2px 2px 0 var(--border-strong);
   font-family: var(--font-display);
   font-variant-numeric: tabular-nums;
   font-weight: 700;
-  font-size: 26px;
+  font-size: 24px;
   line-height: 1;
   color: ${p => (p.tone === 'critical' ? 'var(--down)' : p.tone === 'warn' ? 'var(--accent)' : 'var(--text)')};
   animation: ${p => (p.tone === 'critical' ? 'litePulse 0.6s ease-in-out infinite' : 'none')};
-  span { font-size: 13px; color: var(--text-dim); }
 `;
 
 const TopLabel = styled.div`
@@ -302,7 +310,7 @@ export const MatchScreen: React.FC = () => {
           <span className="uname">{match.you.name}</span>
         </UserChip>
         {live
-          ? <TopTimer tone={tone}>{sec}<span>s</span></TopTimer>
+          ? <TopTimer tone={tone}>{sec}</TopTimer>
           : <TopLabel>{match.phase === 'arming' ? 'Get ready' : ''}</TopLabel>}
         <Pot>{match.mode === 'pvp' ? <>Wager <span className="v">${match.wagerUSD}</span></> : <>Solo</>}</Pot>
       </TopBar>
