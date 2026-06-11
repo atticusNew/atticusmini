@@ -31,6 +31,11 @@ export interface MatchmakeResult {
   role: 'host' | 'guest';
   /** Shared wall-clock ms when the live 30s window begins (arming ends). */
   liveStartAt: number;
+  /**
+   * serverClock − clientClock at pairing. Add to local Date.now() to compare
+   * against liveStartAt without device clock skew. 0 for same-device transports.
+   */
+  clockOffsetMs: number;
   opponent: { name: string; avatar: string };
 }
 

@@ -107,12 +107,13 @@ export class BroadcastChannelTransport implements MatchTransport {
               guestName: msg.name, guestAvatar: msg.avatar,
             };
             ch.postMessage(pair);
-            settle({ matchId, role: 'host', liveStartAt, opponent: { name: msg.name, avatar: msg.avatar } });
+            // Same device → no clock skew.
+            settle({ matchId, role: 'host', liveStartAt, clockOffsetMs: 0, opponent: { name: msg.name, avatar: msg.avatar } });
           }
           // else: I'm the guest — wait for the host's pair message.
         } else if (msg.k === 'pair' && msg.guestId === me) {
           settle({
-            matchId: msg.matchId, role: 'guest', liveStartAt: msg.liveStartAt,
+            matchId: msg.matchId, role: 'guest', liveStartAt: msg.liveStartAt, clockOffsetMs: 0,
             opponent: { name: msg.hostName, avatar: msg.hostAvatar },
           });
         }

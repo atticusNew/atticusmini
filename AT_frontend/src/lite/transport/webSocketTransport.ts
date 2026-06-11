@@ -24,32 +24,63 @@ import type {
 const BASE_URL: string | undefined =
   (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_MATCH_WS_URL?.trim() || undefined;
 
+/** Auto-reconnecting room: survives brief drops by reconnecting and replaying
+ *  the join handshake, so the relay re-maps the socket within its grace window. */
 class WebSocketRoom implements Room {
-  private ws: WebSocket;
+  private url: string;
+  private ws: WebSocket | null = null;
   private subs = new Set<(m: RoomMessage) => void>();
   private queue: RoomMessage[] = [];
+  private joinMsg: RoomMessage | null = null;
   private open = false;
+  private closing = false;
+  private retries = 0;
+  private readonly maxRetries = 8;
+
   constructor(base: string, matchId: string) {
-    this.ws = new WebSocket(`${base.replace(/\/$/, '')}/room/${encodeURIComponent(matchId)}`);
-    this.ws.onopen = () => { this.open = true; this.queue.forEach(m => this.ws.send(JSON.stringify(m))); this.queue = []; };
-    this.ws.onmessage = (e: MessageEvent) => {
+    this.url = `${base.replace(/\/$/, '')}/room/${encodeURIComponent(matchId)}`;
+    this.connect();
+  }
+
+  private connect(): void {
+    if (this.closing) return;
+    const ws = new WebSocket(this.url);
+    this.ws = ws;
+    ws.onopen = () => {
+      this.open = true;
+      this.retries = 0;
+      if (this.joinMsg) ws.send(JSON.stringify(this.joinMsg)); // re-identify on reconnect
+      this.queue.forEach(m => ws.send(JSON.stringify(m)));
+      this.queue = [];
+    };
+    ws.onmessage = (e: MessageEvent) => {
       try {
         const m = JSON.parse(String(e.data)) as RoomMessage;
         this.subs.forEach(cb => { try { cb(m); } catch { /* ignore */ } });
       } catch { /* ignore */ }
     };
+    ws.onclose = () => {
+      this.open = false;
+      if (this.closing || this.retries >= this.maxRetries) return;
+      this.retries += 1;
+      setTimeout(() => this.connect(), Math.min(1500, 200 * this.retries));
+    };
+    ws.onerror = () => { try { ws.close(); } catch { /* ignore */ } };
   }
+
   send(msg: RoomMessage): void {
-    if (this.open) this.ws.send(JSON.stringify(msg)); else this.queue.push(msg);
+    if (msg.t === 'join') this.joinMsg = msg;
+    if (this.open && this.ws) this.ws.send(JSON.stringify(msg)); else this.queue.push(msg);
   }
   subscribe(cb: (m: RoomMessage) => void): () => void {
     this.subs.add(cb);
     return () => this.subs.delete(cb);
   }
   close(): void {
-    try { this.send({ t: 'bye' }); } catch { /* ignore */ }
+    this.closing = true;
+    try { if (this.open && this.ws) this.ws.send(JSON.stringify({ t: 'bye' })); } catch { /* ignore */ }
     this.subs.clear();
-    try { this.ws.close(); } catch { /* ignore */ }
+    try { this.ws?.close(); } catch { /* ignore */ }
   }
 }
 
@@ -72,10 +103,12 @@ export class WebSocketTransport implements MatchTransport {
       ws.onerror = () => { clearTimeout(timeout); clearInterval(cancelTimer); settle(null); };
       ws.onmessage = (e: MessageEvent) => {
         try {
-          const m = JSON.parse(String(e.data)) as { type: string } & Partial<MatchmakeResult>;
+          const m = JSON.parse(String(e.data)) as
+            { type: string; serverNow?: number } & Partial<MatchmakeResult>;
           if (m.type === 'paired' && m.matchId && m.role && m.liveStartAt && m.opponent) {
             clearTimeout(timeout); clearInterval(cancelTimer);
-            settle({ matchId: m.matchId, role: m.role, liveStartAt: m.liveStartAt, opponent: m.opponent });
+            const clockOffsetMs = typeof m.serverNow === 'number' ? m.serverNow - Date.now() : 0;
+            settle({ matchId: m.matchId, role: m.role, liveStartAt: m.liveStartAt, clockOffsetMs, opponent: m.opponent });
           }
         } catch { /* ignore */ }
       };

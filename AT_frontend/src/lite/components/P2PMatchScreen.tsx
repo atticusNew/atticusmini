@@ -113,10 +113,13 @@ export const P2PMatchScreen: React.FC = () => {
   const youEnteredRef = useRef(false);
   const settledRef = useRef(false);
 
+  // Server-synced clock removes device clock skew between the two players.
+  const clockOffset = peer?.info.clockOffsetMs ?? 0;
+  const sNow = now + clockOffset;
   const liveStartAt = peer?.info.liveStartAt ?? 0;
   const expiryAt = liveStartAt + DURATION_SEC * 1000;
   const phase: 'arming' | 'live' | 'settled' =
-    !liveStartAt ? 'arming' : now < liveStartAt ? 'arming' : now < expiryAt ? 'live' : 'settled';
+    !liveStartAt ? 'arming' : sNow < liveStartAt ? 'arming' : sNow < expiryAt ? 'live' : 'settled';
   const live = phase === 'live';
 
   // Room: identify ourselves to the relay, then handle peer + authoritative msgs.
@@ -155,18 +158,18 @@ export const P2PMatchScreen: React.FC = () => {
     return unsub;
   }, [peer, setMatch, commitResult]);
 
-  // Capture price path during the live window.
+  // Capture price path during the live window (timestamps in server time).
   useEffect(() => {
     if (live && spot > 0) {
-      seriesRef.current = [...seriesRef.current, { t: now, p: spot }].slice(-160);
+      seriesRef.current = [...seriesRef.current, { t: sNow, p: spot }].slice(-160);
     }
-  }, [live, now, spot]);
+  }, [live, sNow, spot]);
 
   // Lock YOUR entry exactly at the shared live start (auto-pick if undecided).
   useEffect(() => {
     const m = matchRef.current;
     if (!m || !peer || youEnteredRef.current) return;
-    if (now >= liveStartAt && liveStartAt > 0 && spot > 0) {
+    if (sNow >= liveStartAt && liveStartAt > 0 && spot > 0) {
       youEnteredRef.current = true;
       const dir = chosenDir ?? chooseDirection(recentReturn(), 0.5);
       const you = openSide(m.you, dir, spot, liveStartAt);
@@ -182,9 +185,9 @@ export const P2PMatchScreen: React.FC = () => {
   useEffect(() => {
     const m = matchRef.current;
     if (!m || settledRef.current) return;
-    if (phase === 'settled' && liveStartAt > 0 && spot > 0 && now >= expiryAt + LOCAL_SETTLE_GRACE_MS) {
+    if (phase === 'settled' && liveStartAt > 0 && spot > 0 && sNow >= expiryAt + LOCAL_SETTLE_GRACE_MS) {
       settledRef.current = true;
-      const settled = settleMatch(m, spot, now);
+      const settled = settleMatch(m, spot, sNow);
       haptics.settle();
       setMatch(settled);
       if (settled.result) commitResult(settled.result);
@@ -208,8 +211,8 @@ export const P2PMatchScreen: React.FC = () => {
     );
   }
 
-  const remainingSec = Math.max(0, Math.ceil((expiryAt - now) / 1000));
-  const armRemaining = Math.max(0, Math.ceil((liveStartAt - now) / 1000));
+  const remainingSec = Math.max(0, Math.ceil((expiryAt - sNow) / 1000));
+  const armRemaining = Math.max(0, Math.ceil((liveStartAt - sNow) / 1000));
   const tone = remainingSec <= 5 ? 'critical' : remainingSec <= 10 ? 'warn' : 'normal';
 
   const youPnl = effectivePnlUSD(match.you, spot);
@@ -271,7 +274,7 @@ export const P2PMatchScreen: React.FC = () => {
           )}
           <MatchChart
             series={chartSeries}
-            now={now}
+            now={sNow}
             live={live}
             windowStart={liveStartAt}
             durationSec={DURATION_SEC}

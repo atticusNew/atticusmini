@@ -20,6 +20,12 @@ const DURATION_MS = Number(process.env.RELAY_DURATION_MS) || 30_000;
 const LEVERAGE = 120;
 const PUSH_EPS = 0.01;
 const SETTLE_GRACE_MS = 600; // let a last-instant sell land before settling
+const RECONNECT_GRACE_MS = Number(process.env.RELAY_RECONNECT_GRACE_MS) || 6_000;
+// Abuse controls.
+const MAX_CONN_PER_IP = Number(process.env.RELAY_MAX_CONN_PER_IP) || 40; // per window
+const CONN_WINDOW_MS = 10_000;
+const MAX_WAITING = 1000;
+const MAX_ROOMS = 5000;
 
 // ---- authoritative price feed -------------------------------------------------
 let spot = 0;
@@ -57,6 +63,7 @@ export function attachMatchRelay(server) {
   const wss = new WebSocketServer({ noServer: true });
   const waitingByWager = new Map(); // wager -> { ws, seek }
   const matches = new Map();        // matchId -> match
+  const ipHits = new Map();         // ip -> number[] (recent connection timestamps)
 
   pollSpot();
   const priceTimer = setInterval(pollSpot, 1200);
@@ -65,9 +72,20 @@ export function attachMatchRelay(server) {
   const send = (ws, obj) => { try { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); } catch { /* ignore */ } };
   const other = role => (role === 'host' ? 'guest' : 'host');
 
+  const rateLimited = req => {
+    const ip = req.socket?.remoteAddress || 'unknown';
+    const now = Date.now();
+    const hits = (ipHits.get(ip) || []).filter(t => now - t < CONN_WINDOW_MS);
+    if (hits.length >= MAX_CONN_PER_IP) { ipHits.set(ip, hits); return true; }
+    hits.push(now);
+    ipHits.set(ip, hits);
+    return false;
+  };
+
   server.on('upgrade', (req, socket, head) => {
     let pathname;
     try { pathname = new URL(req.url, 'http://localhost').pathname; } catch { socket.destroy(); return; }
+    if (rateLimited(req)) { socket.destroy(); return; }
     if (pathname === '/matchmake') {
       wss.handleUpgrade(req, socket, head, ws => onMatchmake(ws));
     } else if (pathname.startsWith('/room/')) {
@@ -90,6 +108,7 @@ export function attachMatchRelay(server) {
       const bucket = waitingByWager.get(wager);
 
       if (bucket && bucket.ws.readyState === 1) {
+        if (matches.size >= MAX_ROOMS) { ws.close(); return; }
         waitingByWager.delete(wager);
         const peer = bucket;
         const matchId = `m-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -105,14 +124,15 @@ export function attachMatchRelay(server) {
           timers: {},
         };
         matches.set(matchId, match);
-        send(peer.ws, { type: 'paired', matchId, role: 'host', liveStartAt, opponent: { name: seek.name, avatar: seek.avatar } });
-        send(ws, { type: 'paired', matchId, role: 'guest', liveStartAt, opponent: { name: peer.seek.name, avatar: peer.seek.avatar } });
+        send(peer.ws, { type: 'paired', matchId, role: 'host', liveStartAt, serverNow: Date.now(), opponent: { name: seek.name, avatar: seek.avatar } });
+        send(ws, { type: 'paired', matchId, role: 'guest', liveStartAt, serverNow: Date.now(), opponent: { name: peer.seek.name, avatar: peer.seek.avatar } });
 
         // Capture the authoritative entry price at the shared start.
         match.timers.start = setTimeout(() => { match.entrySpot = spot; }, Math.max(0, liveStartAt - Date.now()));
         // Settle authoritatively a hair after expiry.
         match.timers.expiry = setTimeout(() => settle(match, 'expiry'), Math.max(0, expiryAt + SETTLE_GRACE_MS - Date.now()));
       } else {
+        if (waitingByWager.size >= MAX_WAITING) { ws.close(); return; }
         const me = { ws, seek: { name: seek.name, avatar: seek.avatar }, wager, amount };
         waitingByWager.set(wager, me);
         ws.on('close', () => { if (waitingByWager.get(wager) === me) waitingByWager.delete(wager); });
@@ -130,6 +150,9 @@ export function attachMatchRelay(server) {
       try { msg = JSON.parse(data.toString()); } catch { return; }
 
       if (msg.t === 'join' && (msg.role === 'host' || msg.role === 'guest')) {
+        // Reconnect: cancel a pending forfeit for this leg.
+        const ftKey = `forfeit_${msg.role}`;
+        if (match.timers[ftKey]) { clearTimeout(match.timers[ftKey]); delete match.timers[ftKey]; }
         ws._role = msg.role;
         match.sockets[msg.role] = ws;
         match.sides[msg.role].connected = true;
@@ -155,20 +178,24 @@ export function attachMatchRelay(server) {
 
     ws.on('close', () => {
       const role = ws._role;
-      if (role) {
-        match.sides[role].connected = false;
-        if (match.sockets[role] === ws) match.sockets[role] = null;
-        // Forfeit: if the match isn't settled and a player drops, the other wins.
-        if (!match.settled) settle(match, 'forfeit', other(role));
-      }
+      if (!role) return;
+      match.sides[role].connected = false;
+      if (match.sockets[role] === ws) match.sockets[role] = null;
+      if (match.settled) return;
+      // Grace window: let the player reconnect before declaring a forfeit.
+      match.timers[`forfeit_${role}`] = setTimeout(
+        () => settle(match, 'forfeit', other(role)),
+        RECONNECT_GRACE_MS,
+      );
     });
   }
 
   function settle(match, reason, forfeitWinner) {
     if (match.settled) return;
     match.settled = true;
-    if (match.timers.start) clearTimeout(match.timers.start);
-    if (match.timers.expiry) clearTimeout(match.timers.expiry);
+    for (const key of ['start', 'expiry', 'forfeit_host', 'forfeit_guest']) {
+      if (match.timers[key]) clearTimeout(match.timers[key]);
+    }
 
     const finalSpot = spot;
     const entry = match.entrySpot || finalSpot;
