@@ -35,23 +35,32 @@ const Fighter = styled.div<{ align: 'left' | 'right' }>`
   gap: 10px;
   flex-direction: ${p => (p.align === 'right' ? 'row-reverse' : 'row')};
   text-align: ${p => p.align};
-  .name { font-weight: 800; font-size: 14px; }
+  .name { font-family: var(--font-display); font-weight: 700; font-size: 15px; }
   .dir { font-size: 12px; font-weight: 700; }
 `;
 
 const Vs = styled.div`
-  font-weight: 900;
-  color: var(--accent);
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: #fff;
+  background: var(--purple);
+  border: 2px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 4px 10px;
   font-size: 14px;
+  box-shadow: 2px 2px 0 var(--border-strong);
 `;
 
 const Timer = styled.div<{ tone: 'normal' | 'warn' | 'critical' }>`
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
   font-variant-numeric: tabular-nums;
-  font-weight: 900;
-  font-size: 40px;
+  font-weight: 700;
+  font-size: 54px;
   text-align: center;
+  line-height: 1;
   color: ${p => (p.tone === 'critical' ? 'var(--down)' : p.tone === 'warn' ? 'var(--accent)' : 'var(--text)')};
+  -webkit-text-stroke: 1px var(--border-strong);
+  animation: ${p => (p.tone === 'critical' ? 'litePulse 0.6s ease-in-out infinite' : 'none')};
 `;
 
 const PnlRow = styled.div`
@@ -61,20 +70,23 @@ const PnlRow = styled.div`
 `;
 
 const PnlCard = styled.div<{ lead: boolean }>`
-  background: var(--bg-elev);
-  border: 1.5px solid ${p => (p.lead ? 'var(--accent)' : 'var(--border)')};
-  border-radius: 14px;
+  background: ${p => (p.lead ? 'var(--accent)' : 'var(--bg-elev)')};
+  border: 2px solid var(--border-strong);
+  border-radius: 16px;
   padding: 12px;
   text-align: center;
-  .who { font-size: 12px; color: var(--text-dim); font-weight: 700; }
-  .pnl { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 900; font-size: 22px; margin-top: 4px; }
+  box-shadow: ${p => (p.lead ? 'var(--shadow-hard)' : 'none')};
+  transition: 120ms ease-out;
+  .who { font-size: 12px; color: var(--text); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.7; }
+  .pnl { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 800; font-size: 24px; margin-top: 4px; }
 `;
 
 const Pot = styled.div`
   text-align: center;
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 600;
   color: var(--text-dim);
-  .v { color: var(--accent); font-weight: 800; }
+  .v { color: var(--text); font-weight: 800; }
 `;
 
 const DirRow = styled.div`

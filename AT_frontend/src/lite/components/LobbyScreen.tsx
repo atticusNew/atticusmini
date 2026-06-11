@@ -14,30 +14,32 @@ const ProfileCard = styled.div`
   align-items: center;
   gap: 14px;
   background: var(--bg-elev);
-  border: 1px solid var(--border);
-  border-radius: 16px;
+  border: 2px solid var(--border-strong);
+  border-radius: 18px;
   padding: 14px;
+  box-shadow: var(--shadow-hard);
   .meta { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-  .name { font-weight: 800; font-size: 16px; }
-  .bio { color: var(--text-dim); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .name { font-family: var(--font-display); font-weight: 700; font-size: 18px; }
+  .bio { color: var(--text-dim); font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 `;
 
 const Panel = styled.div`
   background: var(--bg-elev);
-  border: 1px solid var(--border);
-  border-radius: 16px;
+  border: 2px solid var(--border-strong);
+  border-radius: 18px;
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  box-shadow: var(--shadow-hard);
 `;
 
 const PanelHead = styled.div`
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  .label { font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); }
-  .val { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 800; font-size: 22px; }
+  .label { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-dim); }
+  .val { font-family: var(--font-display); font-variant-numeric: tabular-nums; font-weight: 700; font-size: 26px; color: var(--accent); -webkit-text-stroke: 0.6px var(--border-strong); }
 `;
 
 const Chips = styled.div`
@@ -49,15 +51,18 @@ const Chips = styled.div`
 const Chip = styled.button<{ active: boolean }>`
   appearance: none;
   cursor: pointer;
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 12px 4px;
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-weight: 800;
   font-size: 14px;
   background: ${p => (p.active ? 'var(--accent)' : 'var(--bg-elev-2)')};
-  color: ${p => (p.active ? '#1a1410' : 'var(--text)')};
-  border: 1px solid ${p => (p.active ? 'var(--accent)' : 'var(--border)')};
+  color: var(--text);
+  border: 2px solid var(--border-strong);
+  box-shadow: ${p => (p.active ? '2px 2px 0 var(--border-strong)' : 'none')};
+  transition: 80ms ease-out;
+  &:active { transform: translate(2px, 2px); box-shadow: none; }
 `;
 
 const Stepper = styled.div`
@@ -65,11 +70,13 @@ const Stepper = styled.div`
   align-items: center;
   gap: 10px;
   button {
-    appearance: none; cursor: pointer; width: 40px; height: 40px;
-    border-radius: 10px; border: 1px solid var(--border);
-    background: var(--bg-elev-2); color: var(--text); font-size: 20px;
+    appearance: none; cursor: pointer; width: 42px; height: 42px;
+    border-radius: 12px; border: 2px solid var(--border-strong);
+    background: var(--bg-elev-2); color: var(--text); font-size: 22px; font-weight: 700;
+    box-shadow: 2px 2px 0 var(--border-strong);
   }
-  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button:active:not(:disabled) { transform: translate(2px,2px); box-shadow: none; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
 `;
 
 const WAGER_CHIPS = [2, 10, 25, 50];

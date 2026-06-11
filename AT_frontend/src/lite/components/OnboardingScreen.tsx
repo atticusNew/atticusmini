@@ -31,12 +31,16 @@ const MethodButton = styled.button<{ active: boolean }>`
   appearance: none;
   cursor: pointer;
   border-radius: 12px;
-  padding: 12px;
-  font-weight: 700;
-  font-size: 13px;
-  background: ${p => (p.active ? 'var(--bg-elev-2)' : 'transparent')};
-  border: 1.5px solid ${p => (p.active ? 'var(--accent)' : 'var(--border)')};
+  padding: 13px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 14px;
+  background: ${p => (p.active ? 'var(--accent)' : 'var(--bg-elev)')};
+  border: 2px solid var(--border-strong);
   color: var(--text);
+  box-shadow: ${p => (p.active ? '2px 2px 0 var(--border-strong)' : 'none')};
+  transition: 80ms ease-out;
+  &:active { transform: translate(2px,2px); box-shadow: none; }
 `;
 
 const defaultAvatar = (seed: string): string => {

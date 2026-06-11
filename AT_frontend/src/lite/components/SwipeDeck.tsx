@@ -14,11 +14,11 @@ const DeckArea = styled.div`
 const Card = styled.div<{ x: number; rot: number; dragging: boolean; depth: number }>`
   position: absolute;
   inset: 0;
-  border-radius: 22px;
+  border-radius: 24px;
   overflow: hidden;
   background: var(--bg-elev);
-  border: 1px solid var(--border);
-  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  border: 3px solid var(--border-strong);
+  box-shadow: var(--shadow-hard-lg);
   transform: translateX(${p => p.x}px) rotate(${p => p.rot}deg) scale(${p => 1 - p.depth * 0.04}) translateY(${p => p.depth * 10}px);
   transition: ${p => (p.dragging ? 'none' : 'transform 240ms ease-out')};
   touch-action: pan-y;
@@ -35,8 +35,9 @@ const CardBody = styled.div`
   display: flex;
   flex-direction: column;
   gap: 8px;
-  .name { font-size: 24px; font-weight: 800; }
-  .bio { color: var(--text-dim); font-size: 14px; }
+  background: var(--bg-elev);
+  .name { font-family: var(--font-display); font-size: 26px; font-weight: 700; }
+  .bio { color: var(--text-dim); font-size: 14px; font-weight: 500; }
 `;
 
 const CardStats = styled.div`
@@ -76,16 +77,19 @@ const Actions = styled.div`
 const Action = styled.button<{ tone: 'nope' | 'solo' | 'like' }>`
   appearance: none;
   cursor: pointer;
-  width: ${p => (p.tone === 'solo' ? 56 : 66)}px;
-  height: ${p => (p.tone === 'solo' ? 56 : 66)}px;
+  width: ${p => (p.tone === 'solo' ? 58 : 70)}px;
+  height: ${p => (p.tone === 'solo' ? 58 : 70)}px;
   border-radius: 50%;
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 800;
-  background: var(--bg-elev);
-  border: 2px solid ${p => (p.tone === 'like' ? 'var(--up)' : p.tone === 'nope' ? 'var(--down)' : 'var(--accent)')};
-  color: ${p => (p.tone === 'like' ? 'var(--up)' : p.tone === 'nope' ? 'var(--down)' : 'var(--accent)')};
+  background: ${p => (p.tone === 'like' ? 'var(--up)' : p.tone === 'nope' ? 'var(--down)' : 'var(--accent)')};
+  border: 3px solid var(--border-strong);
+  color: ${p => (p.tone === 'solo' ? 'var(--text)' : '#fff')};
+  box-shadow: var(--shadow-hard);
   display: flex; align-items: center; justify-content: center;
-  &:active { transform: scale(0.92); }
+  transition: 90ms ease-out;
+  &:active:not(:disabled) { transform: translate(3px,3px); box-shadow: none; }
+  &:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
 `;
 
 const Empty = styled.div`
@@ -93,9 +97,11 @@ const Empty = styled.div`
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 12px; color: var(--text-dim); text-align: center; padding: 24px;
   button {
-    appearance: none; cursor: pointer; background: var(--accent); color: #1a1410;
-    border: none; border-radius: 12px; padding: 12px 20px; font-weight: 800;
+    appearance: none; cursor: pointer; background: var(--accent); color: var(--text);
+    border: 2px solid var(--border-strong); border-radius: 14px; padding: 12px 20px;
+    font-family: var(--font-display); font-weight: 700; box-shadow: var(--shadow-hard);
   }
+  button:active { transform: translate(2px,2px); box-shadow: none; }
 `;
 
 const THRESHOLD = 110;

@@ -15,17 +15,20 @@ const Body = styled.div`
 `;
 
 const Banner = styled.div<{ outcome: 'you' | 'opp' | 'push' }>`
-  font-size: 40px;
-  font-weight: 900;
-  letter-spacing: 0.02em;
+  font-family: var(--font-display);
+  font-size: 52px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1;
   color: ${p => (p.outcome === 'you' ? 'var(--up)' : p.outcome === 'opp' ? 'var(--down)' : 'var(--accent)')};
+  -webkit-text-stroke: 1.5px var(--border-strong);
 `;
 
 const Net = styled.div<{ pos: boolean }>`
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-weight: 900;
-  font-size: 30px;
+  font-weight: 800;
+  font-size: 34px;
   color: ${p => (p.pos ? 'var(--up)' : 'var(--down)')};
 `;
 

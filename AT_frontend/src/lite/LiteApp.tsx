@@ -8,7 +8,7 @@
  */
 
 import React from 'react';
-import { GlobalTheme } from '../ui/GlobalTheme';
+import { LiteTheme } from './ui/LiteTheme';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { LiteSessionProvider, useLiteSession } from './state/LiteSessionProvider';
 import { OnboardingScreen } from './components/OnboardingScreen';
@@ -31,7 +31,7 @@ const LiteRouter: React.FC = () => {
 
 export const LiteApp: React.FC = () => (
   <>
-    <GlobalTheme />
+    <LiteTheme />
     <ErrorBoundary fallback={<div style={{ padding: 24 }}>Atticus Lite hit a snag. Reload to retry.</div>}>
       <LiteSessionProvider>
         <LiteRouter />
