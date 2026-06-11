@@ -11,6 +11,7 @@ import {
   secondsRemaining, settleMatch,
 } from '../services/matchEngine';
 import { chooseDirection, shouldSell } from '../services/botStrategy';
+import { haptics } from '../services/haptics';
 import type { Direction, MatchSide, MatchState } from '../types';
 
 const ARM_SECONDS = 5;
@@ -22,7 +23,7 @@ const Body = styled.div`
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 12px 14px 18px;
+  padding: 12px max(14px, env(safe-area-inset-left)) calc(18px + env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-right));
   min-height: 0;
 `;
 
@@ -242,6 +243,7 @@ export const MatchScreen: React.FC = () => {
       settledRef.current = false;
       botDelayMsRef.current = 600 + Math.random() * 1800;
       const you = openSide(match.you, dir, spot, t);
+      haptics.pick();
       setMatch({ ...match, you, entrySpot: spot, startedAt: t, phase: 'live' });
     },
     [match, spot, setMatch],
@@ -258,6 +260,7 @@ export const MatchScreen: React.FC = () => {
 
   const sellYou = useCallback(() => {
     if (!match || match.phase !== 'live') return;
+    haptics.sell();
     setMatch({ ...match, you: closeSide(match.you, spot, Date.now()) });
   }, [match, spot, setMatch]);
 
@@ -280,6 +283,7 @@ export const MatchScreen: React.FC = () => {
     if (isExpired(next, now) || bothClosedForMode(next)) {
       settledRef.current = true;
       const settled = settleMatch(next, spot, now);
+      haptics.settle();
       setMatch(settled);
       if (settled.result) commitResult(settled.result);
       return;
@@ -393,11 +397,14 @@ export const MatchScreen: React.FC = () => {
 
         {match.phase === 'arming' ? (
           <DirRow>
-            <BigButton tone="up" disabled={spot <= 0} onClick={() => arm('up')}>▲ HIGH</BigButton>
-            <BigButton tone="down" disabled={spot <= 0} onClick={() => arm('down')}>▼ LOW</BigButton>
+            <BigButton tone="up" disabled={spot <= 0} onClick={() => arm('up')}
+              aria-label="Bet BTC goes higher">▲ HIGH</BigButton>
+            <BigButton tone="down" disabled={spot <= 0} onClick={() => arm('down')}
+              aria-label="Bet BTC goes lower">▼ LOW</BigButton>
           </DirRow>
         ) : match.you.status === 'open' ? (
-          <BigButton tone="ghost" onClick={sellYou}>
+          <BigButton tone="ghost" onClick={sellYou}
+            aria-label="Sell now and lock your current profit or loss">
             Sell now · lock {fmt(livePnlUSD(match.you, spot))}
           </BigButton>
         ) : (

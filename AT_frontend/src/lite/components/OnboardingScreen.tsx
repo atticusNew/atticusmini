@@ -60,13 +60,41 @@ export const OnboardingScreen: React.FC = () => {
   const [bio, setBio] = useState('');
   const [avatar, setAvatar] = useState<string | null>(null);
   const [method, setMethod] = useState<RegistrationMethod>('app');
+  const [err, setErr] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Downscale + re-encode the chosen photo so the stored avatar stays small
+  // (it lives in localStorage) and validate it's a reasonable image.
   const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!file.type.startsWith('image/')) { setErr('Please choose an image file.'); return; }
+    if (file.size > 20 * 1024 * 1024) { setErr('That image is too large (max 20MB).'); return; }
+    setErr(null);
     const reader = new FileReader();
-    reader.onload = () => setAvatar(typeof reader.result === 'string' ? reader.result : null);
+    reader.onload = () => {
+      const src = typeof reader.result === 'string' ? reader.result : '';
+      if (!src) return;
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 256;
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { setAvatar(src); return; }
+        ctx.drawImage(img, 0, 0, w, h);
+        try {
+          setAvatar(canvas.toDataURL('image/jpeg', 0.85));
+        } catch {
+          setAvatar(src);
+        }
+      };
+      img.onerror = () => setErr('Could not read that image.');
+      img.src = src;
+    };
     reader.readAsDataURL(file);
   };
 
@@ -89,6 +117,7 @@ export const OnboardingScreen: React.FC = () => {
           <span>Tap to add a photo</span>
           <input ref={fileRef} type="file" accept="image/*" hidden onChange={onPickFile} />
         </AvatarPicker>
+        {err && <Sub style={{ color: 'var(--down)', textAlign: 'center' }}>{err}</Sub>}
 
         <Field>
           Name / handle

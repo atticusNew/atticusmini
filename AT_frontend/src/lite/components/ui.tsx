@@ -27,7 +27,9 @@ export const ScreenBody = styled.div`
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 20px 18px 28px;
+  padding: 20px 18px calc(28px + env(safe-area-inset-bottom));
+  padding-left: max(18px, env(safe-area-inset-left));
+  padding-right: max(18px, env(safe-area-inset-right));
   min-height: 0;
 `;
 
@@ -36,7 +38,7 @@ export const TopBar = styled.header`
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 12px 16px;
+  padding: calc(12px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 12px max(16px, env(safe-area-inset-left));
   border-bottom: 2px solid var(--border-strong);
   position: sticky;
   top: 0;

@@ -51,6 +51,26 @@ const LiteGlobal = createGlobalStyle`
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
+  /* Prevent rubber-band / pull-to-refresh bounce inside the app. */
+  html, body { overscroll-behavior: none; }
+
+  /* Keyboard focus ring (only for keyboard users, not mouse/touch). */
+  :focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  /* Respect reduced-motion preference: kill animations + transitions. */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
   html, body {
     background:
       radial-gradient(circle at 18% 12%, rgba(240,169,46,0.16), transparent 42%),

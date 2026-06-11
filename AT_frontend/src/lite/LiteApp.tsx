@@ -14,6 +14,7 @@ import { LiteSessionProvider, useLiteSession } from './state/LiteSessionProvider
 import { OnboardingScreen } from './components/OnboardingScreen';
 import { LobbyScreen } from './components/LobbyScreen';
 import { SwipeDeck } from './components/SwipeDeck';
+import { MatchmakingScreen } from './components/MatchmakingScreen';
 import { MatchScreen } from './components/MatchScreen';
 import { ResultScreen } from './components/ResultScreen';
 
@@ -23,6 +24,7 @@ const LiteRouter: React.FC = () => {
     case 'onboarding': return <OnboardingScreen />;
     case 'lobby': return <LobbyScreen />;
     case 'swipe': return <SwipeDeck />;
+    case 'matchmaking': return <MatchmakingScreen />;
     case 'match': return <MatchScreen />;
     case 'result': return <ResultScreen />;
     default: return <LobbyScreen />;

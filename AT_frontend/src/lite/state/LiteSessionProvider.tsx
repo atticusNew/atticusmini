@@ -30,6 +30,7 @@ export type LiteScreen =
   | 'onboarding'
   | 'lobby'
   | 'swipe'
+  | 'matchmaking'
   | 'match'
   | 'result';
 
@@ -50,6 +51,7 @@ interface LiteSessionValue {
   goLobby: () => void;
   openSwipe: () => void;
   challenge: (opp: Opponent) => void;
+  enterMatch: () => void;
   startSolo: () => void;
   setMatch: (m: MatchState) => void;
   commitResult: (result: MatchResult) => void;
@@ -126,10 +128,12 @@ export const LiteSessionProvider: React.FC<{ children: ReactNode }> = ({ childre
     (opp: Opponent) => {
       setOpponent(opp);
       setMatchState(buildMatch('pvp', opp));
-      setScreen('match');
+      setScreen('matchmaking');
     },
     [buildMatch],
   );
+
+  const enterMatch = useCallback(() => setScreen('match'), []);
 
   const startSolo = useCallback(() => {
     setOpponent(null);
@@ -175,6 +179,7 @@ export const LiteSessionProvider: React.FC<{ children: ReactNode }> = ({ childre
       goLobby,
       openSwipe,
       challenge,
+      enterMatch,
       startSolo,
       setMatch,
       commitResult,
@@ -183,7 +188,7 @@ export const LiteSessionProvider: React.FC<{ children: ReactNode }> = ({ childre
     [
       screen, profile, balance, wagerUSD, amountUSD, deck, opponent, match,
       completeOnboarding, setWager, setAmount, deposit, goLobby, openSwipe,
-      challenge, startSolo, setMatch, commitResult, rematch,
+      challenge, enterMatch, startSolo, setMatch, commitResult, rematch,
     ],
   );
 
