@@ -162,15 +162,8 @@ export const MatchChart: React.FC<MatchChartProps> = ({
               strokeLinejoin="round" strokeLinecap="round" />
           )}
 
-          {/* Current price marker + tag */}
+          {/* Current price marker (price value shown in the top-center pill) */}
           <circle cx={frontX} cy={spotY} r={6} fill="#fff" stroke="#7b5ea7" strokeWidth={3} />
-          {spot > 0 && (
-            <g transform={`translate(${Math.min(frontX + 9, right - 52)}, ${Math.max(10, spotY - 9)})`}>
-              <rect x={0} y={0} width={52} height={18} rx={5} fill="#2a1f4a" opacity={0.92} />
-              <text x={6} y={13} fontSize={10} fontWeight={700} fill="#fff"
-                style={{ fontFamily: 'var(--font-mono)' }}>{fmtPrice(spot)}</text>
-            </g>
-          )}
         </svg>
       )}
     </Wrap>
