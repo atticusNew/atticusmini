@@ -73,6 +73,8 @@ export interface MatchSide {
   amountUSD: number;
   /** Spot captured when this side opened its position. */
   entrySpot: number | null;
+  /** Wall-clock ms the side opened (for plotting the entry dot on the chart). */
+  entryAt: number | null;
   /**
    * Strike barrier the side is measured against — set just beyond entry in the
    * chosen direction (entry + offset for HIGH, entry − offset for LOW). Price

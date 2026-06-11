@@ -103,6 +103,7 @@ export const makeSide = (
   direction: null,
   amountUSD: clampAmount(amountUSD),
   entrySpot: null,
+  entryAt: null,
   strikeUSD: null,
   status: 'idle',
   realizedPnlUSD: null,
@@ -137,12 +138,14 @@ export const openSide = (
   side: MatchSide,
   direction: Direction,
   spot: number,
+  nowMs: number = Date.now(),
 ): MatchSide => {
   if (side.status !== 'idle') return side;
   return {
     ...side,
     direction,
     entrySpot: spot,
+    entryAt: nowMs,
     strikeUSD: strikeFor(spot, direction),
     status: 'open',
   };

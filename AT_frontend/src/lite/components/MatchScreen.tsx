@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef } from 'react';
-import styled from 'styled-components';
+import styled, { keyframes } from 'styled-components';
 import { useLiteSession } from '../state/LiteSessionProvider';
 import { useSynchronizedPrice } from '../../hooks/useGlobalPriceFeed';
 import { pricingEngine } from '../../services/OffChainPricingEngine';
@@ -11,32 +11,72 @@ import {
   secondsRemaining, settleMatch,
 } from '../services/matchEngine';
 import { chooseDirection, shouldSell } from '../services/botStrategy';
-import type { Direction, MatchState } from '../types';
+import type { Direction, MatchSide, MatchState } from '../types';
+
+const ARM_SECONDS = 5;
+const YOU_COLOR = '#ffd23f';
+const OPP_COLOR = '#41d7ff';
 
 const Body = styled.div`
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 14px 16px 22px;
+  gap: 12px;
+  padding: 12px 14px 18px;
   min-height: 0;
 `;
 
-const VersusRow = styled.div`
+const Scoreboard = styled.div`
   display: grid;
   grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 10px;
+  align-items: stretch;
+  gap: 8px;
 `;
 
-const Fighter = styled.div<{ align: 'left' | 'right' }>`
+const SideCard = styled.div<{ side: 'you' | 'opp'; lead: boolean }>`
   display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  border-radius: 14px;
+  border: 2px solid ${p => (p.lead ? 'var(--border-strong)' : 'var(--border)')};
+  background: ${p => (p.lead ? 'var(--bg-elev)' : 'var(--bg-elev-2)')};
+  box-shadow: ${p => (p.lead ? 'var(--shadow-hard)' : 'none')};
+  align-items: ${p => (p.side === 'opp' ? 'flex-end' : 'flex-start')};
+  transition: 120ms ease-out;
+  position: relative;
+  .top { display: flex; align-items: center; gap: 8px; flex-direction: ${p => (p.side === 'opp' ? 'row-reverse' : 'row')}; }
+  .name { font-family: var(--font-display); font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--border-strong); }
+  .pnl { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 800; font-size: 22px; }
+  .tag { font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+`;
+
+const Crown = styled.div<{ side: 'you' | 'opp' }>`
+  position: absolute;
+  top: -10px;
+  ${p => (p.side === 'opp' ? 'right: 8px;' : 'left: 8px;')}
+  font-size: 16px;
+`;
+
+const DirPill = styled.span<{ dir: Direction | null }>`
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-strong);
+  color: #fff;
+  background: ${p => (p.dir === 'up' ? 'var(--up)' : p.dir === 'down' ? 'var(--down)' : 'var(--text-muted)')};
+`;
+
+const CenterCol = styled.div`
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
-  flex-direction: ${p => (p.align === 'right' ? 'row-reverse' : 'row')};
-  text-align: ${p => p.align};
-  .name { font-family: var(--font-display); font-weight: 700; font-size: 15px; }
-  .dir { font-size: 12px; font-weight: 700; }
+  justify-content: center;
+  gap: 4px;
+  min-width: 52px;
 `;
 
 const Vs = styled.div`
@@ -46,40 +86,68 @@ const Vs = styled.div`
   background: var(--purple);
   border: 2px solid var(--border-strong);
   border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 14px;
+  padding: 3px 9px;
+  font-size: 13px;
   box-shadow: 2px 2px 0 var(--border-strong);
 `;
 
-const Timer = styled.div<{ tone: 'normal' | 'warn' | 'critical' }>`
+const LiveClock = styled.div<{ tone: 'normal' | 'warn' | 'critical' }>`
   font-family: var(--font-display);
   font-variant-numeric: tabular-nums;
   font-weight: 700;
-  font-size: 40px;
-  text-align: center;
+  font-size: 30px;
   line-height: 1;
   color: ${p => (p.tone === 'critical' ? 'var(--down)' : p.tone === 'warn' ? 'var(--accent)' : 'var(--text)')};
-  -webkit-text-stroke: 1px var(--border-strong);
+  -webkit-text-stroke: 0.8px var(--border-strong);
   animation: ${p => (p.tone === 'critical' ? 'litePulse 0.6s ease-in-out infinite' : 'none')};
 `;
 
-const PnlRow = styled.div`
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+const ChartFrame = styled.div`
+  position: relative;
+  flex: 1;
+  display: flex;
+  min-height: 0;
 `;
 
-const PnlCard = styled.div<{ lead: boolean }>`
-  background: ${p => (p.lead ? 'var(--accent)' : 'var(--bg-elev)')};
-  border: 2px solid var(--border-strong);
-  border-radius: 16px;
-  padding: 12px;
-  text-align: center;
-  box-shadow: ${p => (p.lead ? 'var(--shadow-hard)' : 'none')};
-  transition: 120ms ease-out;
-  .who { font-size: 12px; color: var(--text); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.7; }
-  .pnl { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 800; font-size: 24px; margin-top: 4px; }
-  .tag { font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-top: 3px; }
+const pulseRing = keyframes`
+  0% { transform: scale(0.92); }
+  50% { transform: scale(1.04); }
+  100% { transform: scale(0.92); }
+`;
+
+const ArmOverlay = styled.div`
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgba(20, 15, 40, 0.42);
+  border-radius: 18px;
+  pointer-events: none;
+`;
+
+const ArmRing = styled.div<{ crit: boolean }>`
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  border: 6px solid ${p => (p.crit ? 'var(--down)' : 'var(--accent)')};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20,15,40,0.5);
+  animation: ${pulseRing} 1s ease-in-out infinite;
+  .n { font-family: var(--font-display); font-weight: 700; font-size: 56px; color: #fff; -webkit-text-stroke: 1px var(--border-strong); }
+`;
+
+const ArmHint = styled.div`
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+  color: #fff;
+  text-shadow: 0 2px 6px rgba(0,0,0,0.5);
+  letter-spacing: 0.04em;
 `;
 
 const Pot = styled.div`
@@ -111,38 +179,44 @@ export const MatchScreen: React.FC = () => {
   const { priceState } = useSynchronizedPrice();
   const spot = priceState.current;
   const live = match?.phase === 'live';
-  const now = useNow(120, live);
+  const now = useNow(120, true);
 
   const seriesRef = useRef<Array<{ t: number; p: number }>>([]);
   const settledRef = useRef(false);
-  // Bot waits a beat before entering so its strike line lands at a different
-  // price than yours — two distinct lines, and the late entry is a real edge.
   const botDelayMsRef = useRef(0);
+  // Arming pick-clock start, keyed to the match so a re-match resets it.
+  const armRef = useRef<{ id: string; at: number }>({ id: '', at: 0 });
+  if (match && match.phase === 'arming' && armRef.current.id !== match.id) {
+    armRef.current = { id: match.id, at: Date.now() };
+  }
 
-  // Capture the price path during the live window for the chart.
   useEffect(() => {
     if (live && spot > 0) {
-      seriesRef.current = [...seriesRef.current, { t: now, p: spot }].slice(-120);
+      seriesRef.current = [...seriesRef.current, { t: now, p: spot }].slice(-160);
     }
   }, [live, now, spot]);
 
   const arm = useCallback(
     (dir: Direction) => {
       if (!match || match.phase !== 'arming' || spot <= 0) return;
-      seriesRef.current = [{ t: Date.now(), p: spot }];
+      const t = Date.now();
+      seriesRef.current = [{ t, p: spot }];
       settledRef.current = false;
-      botDelayMsRef.current = 600 + Math.random() * 1800; // 0.6–2.4s
-      const you = openSide(match.you, dir, spot);
-      setMatch({
-        ...match,
-        you,
-        entrySpot: spot,
-        startedAt: Date.now(),
-        phase: 'live',
-      });
+      botDelayMsRef.current = 600 + Math.random() * 1800;
+      const you = openSide(match.you, dir, spot, t);
+      setMatch({ ...match, you, entrySpot: spot, startedAt: t, phase: 'live' });
     },
-    [match, spot, opponent, setMatch],
+    [match, spot, setMatch],
   );
+
+  // Auto-pick when the 5s arming clock runs out, so the round always starts.
+  useEffect(() => {
+    if (match?.phase === 'arming' && spot > 0 && armRef.current.id === match.id) {
+      if (now - armRef.current.at >= ARM_SECONDS * 1000) {
+        arm(chooseDirection(recentReturn(), 0.5));
+      }
+    }
+  }, [match, now, spot, arm]);
 
   const sellYou = useCallback(() => {
     if (!match || match.phase !== 'live') return;
@@ -152,23 +226,19 @@ export const MatchScreen: React.FC = () => {
   // Live loop: drive the bot + settle on expiry.
   useEffect(() => {
     if (!match || match.phase !== 'live' || spot <= 0 || settledRef.current) return;
-
     let next = match;
     const elapsedMs = match.startedAt != null ? now - match.startedAt : 0;
 
-    // Bot enters after its delay (creates a second, distinct strike line).
     if (match.mode === 'pvp' && opponent && next.opp.status === 'idle' && elapsedMs >= botDelayMsRef.current) {
       const od = chooseDirection(recentReturn(), opponent.skill);
-      next = { ...next, opp: openSide(next.opp, od, spot) };
+      next = { ...next, opp: openSide(next.opp, od, spot, now) };
     }
-
     if (match.mode === 'pvp' && opponent && next.opp.status === 'open') {
       const sec = secondsRemaining(next, now);
       if (shouldSell({ opponent, side: next.opp, spot, secondsRemaining: sec })) {
         next = { ...next, opp: closeSide(next.opp, spot, now) };
       }
     }
-
     if (isExpired(next, now) || bothClosedForMode(next)) {
       settledRef.current = true;
       const settled = settleMatch(next, spot, now);
@@ -176,7 +246,6 @@ export const MatchScreen: React.FC = () => {
       if (settled.result) commitResult(settled.result);
       return;
     }
-
     if (next !== match) setMatch(next);
   }, [match, now, spot, opponent, setMatch, commitResult]);
 
@@ -189,31 +258,48 @@ export const MatchScreen: React.FC = () => {
     );
   }
 
-  const sec = match.phase === 'live' ? Math.ceil(secondsRemaining(match, now)) : match.durationSec;
+  const sec = live ? Math.ceil(secondsRemaining(match, now)) : match.durationSec;
   const tone = sec <= 5 ? 'critical' : sec <= 10 ? 'warn' : 'normal';
   const youPnl = effectivePnlUSD(match.you, spot);
   const oppPnl = match.mode === 'pvp' ? effectivePnlUSD(match.opp, spot) : 0;
   const youLead = match.mode === 'solo' ? youPnl > 0 : youPnl >= oppPnl;
-
-  const dirLabel = (d: Direction | null): string =>
-    d === 'up' ? '▲ HIGH' : d === 'down' ? '▼ LOW' : '—';
+  const oppLead = match.mode === 'pvp' && !youLead;
 
   const strikes: StrikeMark[] = [];
-  if (match.you.direction && match.you.strikeUSD) {
-    strikes.push({ price: match.you.strikeUSD, direction: match.you.direction, label: 'YOU', you: true });
+  if (match.you.direction && match.you.strikeUSD && match.you.entrySpot && match.you.entryAt) {
+    strikes.push({ price: match.you.strikeUSD, entrySpot: match.you.entrySpot, entryAt: match.you.entryAt, direction: match.you.direction, label: 'YOU', you: true });
   }
-  if (match.mode === 'pvp' && match.opp.direction && match.opp.strikeUSD) {
-    strikes.push({ price: match.opp.strikeUSD, direction: match.opp.direction, label: match.opp.name, you: false });
+  if (match.mode === 'pvp' && match.opp.direction && match.opp.strikeUSD && match.opp.entrySpot && match.opp.entryAt) {
+    strikes.push({ price: match.opp.strikeUSD, entrySpot: match.opp.entrySpot, entryAt: match.opp.entryAt, direction: match.opp.direction, label: match.opp.name, you: false });
   }
 
   const youITM = isInTheMoney(match.you, spot);
   const oppITM = isInTheMoney(match.opp, spot);
 
-  // During arming, show recent live history so the chart isn't empty; once the
-  // trade starts, switch to the captured window so the deadline can close in.
   const chartSeries = live
     ? seriesRef.current
     : pricingEngine.getPriceHistory(0.6).map(h => ({ t: h.timestamp, p: h.price }));
+
+  const armRemaining = Math.max(0, Math.ceil(ARM_SECONDS - (now - armRef.current.at) / 1000));
+
+  const renderSide = (side: MatchSide, who: 'you' | 'opp', pnl: number, itm: boolean, lead: boolean, color: string, name: string) => (
+    <SideCard side={who} lead={lead && live}>
+      {lead && live && <Crown side={who}>👑</Crown>}
+      <div className="top">
+        <Avatar src={side.avatar} size={34} />
+        <span className="name"><span className="dot" style={{ background: color }} />{name}</span>
+      </div>
+      <DirPill dir={side.direction}>{side.direction === 'up' ? '▲ HIGH' : side.direction === 'down' ? '▼ LOW' : 'PICK'}</DirPill>
+      <span className="pnl" style={{ color: pnl >= 0 ? 'var(--up)' : 'var(--down)' }}>
+        {side.direction ? fmt(pnl) : '—'}
+      </span>
+      {live && side.direction && (
+        <span className="tag" style={{ color: itm ? 'var(--up)' : 'var(--down)' }}>
+          {itm ? '● in the money' : '○ out of money'}
+        </span>
+      )}
+    </SideCard>
+  );
 
   return (
     <Screen>
@@ -223,83 +309,58 @@ export const MatchScreen: React.FC = () => {
       </TopBar>
 
       <Body>
-        <VersusRow>
-          <Fighter align="left">
-            <Avatar src={match.you.avatar} size={40} />
-            <div>
-              <div className="name">{match.you.name}</div>
-              <div className="dir" style={{ color: match.you.direction === 'up' ? 'var(--up)' : match.you.direction === 'down' ? 'var(--down)' : 'var(--text-dim)' }}>
-                {dirLabel(match.you.direction)}
-              </div>
-            </div>
-          </Fighter>
-          <Vs>VS</Vs>
-          <Fighter align="right">
-            {match.mode === 'pvp' ? (
-              <>
-                <Avatar src={match.opp.avatar} size={40} />
-                <div>
-                  <div className="name">{match.opp.name}</div>
-                  <div className="dir" style={{ color: match.opp.direction === 'up' ? 'var(--up)' : match.opp.direction === 'down' ? 'var(--down)' : 'var(--text-dim)' }}>
-                    {dirLabel(match.opp.direction)}
-                  </div>
+        <Scoreboard>
+          {renderSide(match.you, 'you', youPnl, youITM, youLead, YOU_COLOR, match.you.name)}
+          <CenterCol>
+            {live ? <LiveClock tone={tone}>{sec}s</LiveClock> : <Vs>VS</Vs>}
+          </CenterCol>
+          {match.mode === 'pvp'
+            ? renderSide(match.opp, 'opp', oppPnl, oppITM, oppLead, OPP_COLOR, match.opp.name)
+            : (
+              <SideCard side="opp" lead={false}>
+                <div className="top" style={{ justifyContent: 'flex-end' }}>
+                  <span className="name">Solo</span>
                 </div>
-              </>
-            ) : (
-              <div className="name" style={{ color: 'var(--text-dim)' }}>Beat $0</div>
+                <DirPill dir={null}>BEAT $0</DirPill>
+                <span className="pnl" style={{ color: 'var(--text-dim)' }}>$0.00</span>
+              </SideCard>
             )}
-          </Fighter>
-        </VersusRow>
+        </Scoreboard>
 
-        <Timer tone={tone}>{sec}s</Timer>
-
-        <MatchChart
-          series={chartSeries}
-          now={now}
-          live={live}
-          windowStart={match.startedAt}
-          durationSec={match.durationSec}
-          spot={spot}
-          strikes={strikes}
-        />
-
-        <PnlRow>
-          <PnlCard lead={youLead}>
-            <div className="who">You</div>
-            <div className="pnl" style={{ color: youPnl >= 0 ? 'var(--up)' : 'var(--down)' }}>{fmt(youPnl)}</div>
-            {live && match.you.direction && (
-              <div className="tag" style={{ color: youITM ? 'var(--up)' : 'var(--down)' }}>
-                {youITM ? '● in the money' : '○ out'}
-              </div>
-            )}
-          </PnlCard>
-          <PnlCard lead={!youLead && match.mode === 'pvp'}>
-            <div className="who">{match.mode === 'pvp' ? match.opp.name : 'Target'}</div>
-            <div className="pnl" style={{ color: oppPnl >= 0 ? 'var(--up)' : 'var(--down)' }}>
-              {match.mode === 'pvp' ? fmt(oppPnl) : '$0.00'}
-            </div>
-            {live && match.mode === 'pvp' && match.opp.direction && (
-              <div className="tag" style={{ color: oppITM ? 'var(--up)' : 'var(--down)' }}>
-                {oppITM ? '● in the money' : '○ out'}
-              </div>
-            )}
-          </PnlCard>
-        </PnlRow>
+        <ChartFrame>
+          <MatchChart
+            series={chartSeries}
+            now={now}
+            live={live}
+            windowStart={match.startedAt}
+            durationSec={match.durationSec}
+            spot={spot}
+            strikes={strikes}
+          />
+          {match.phase === 'arming' && (
+            <ArmOverlay>
+              <ArmHint>PICK A SIDE</ArmHint>
+              <ArmRing crit={armRemaining <= 2}>
+                <span className="n">{armRemaining}</span>
+              </ArmRing>
+              <ArmHint style={{ fontSize: 13, opacity: 0.85 }}>
+                {spot > 0 ? 'HIGH or LOW before the clock hits 0' : 'waiting for price…'}
+              </ArmHint>
+            </ArmOverlay>
+          )}
+        </ChartFrame>
 
         {match.phase === 'arming' ? (
-          <>
-            <Pot>Pick your side — locks in your entry at the live price</Pot>
-            <DirRow>
-              <BigButton tone="up" disabled={spot <= 0} onClick={() => arm('up')}>▲ HIGH</BigButton>
-              <BigButton tone="down" disabled={spot <= 0} onClick={() => arm('down')}>▼ LOW</BigButton>
-            </DirRow>
-          </>
+          <DirRow>
+            <BigButton tone="up" disabled={spot <= 0} onClick={() => arm('up')}>▲ HIGH</BigButton>
+            <BigButton tone="down" disabled={spot <= 0} onClick={() => arm('down')}>▼ LOW</BigButton>
+          </DirRow>
         ) : match.you.status === 'open' ? (
           <BigButton tone="ghost" onClick={sellYou}>
             Sell now · lock {fmt(livePnlUSD(match.you, spot))}
           </BigButton>
         ) : (
-          <Pot>Position locked at {fmt(match.you.realizedPnlUSD ?? 0)} — waiting on the clock…</Pot>
+          <Pot>Locked at {fmt(match.you.realizedPnlUSD ?? 0)} — riding the clock…</Pot>
         )}
       </Body>
     </Screen>
