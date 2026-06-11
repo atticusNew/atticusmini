@@ -18,6 +18,7 @@ import { SwipeDeck } from './components/SwipeDeck';
 import { MatchmakingScreen } from './components/MatchmakingScreen';
 import { MatchScreen } from './components/MatchScreen';
 import { P2PMatchScreen } from './components/P2PMatchScreen';
+import { InviteModals } from './components/InviteModals';
 import { ResultScreen } from './components/ResultScreen';
 
 const LiteRouter: React.FC = () => {
@@ -41,6 +42,7 @@ export const LiteApp: React.FC = () => (
     <ErrorBoundary fallback={<div style={{ padding: 24 }}>Atticus Lite hit a snag. Reload to retry.</div>}>
       <LiteSessionProvider>
         <LiteRouter />
+        <InviteModals />
       </LiteSessionProvider>
     </ErrorBoundary>
   </>

@@ -20,7 +20,7 @@ import { WebSocketTransport, webSocketBaseUrl } from './webSocketTransport';
  *      so cross-device P2P "just works" in production, else
  *   3. undefined → local dev uses cross-tab BroadcastChannel.
  */
-const resolveWsBase = (): string | undefined => {
+export const getRelayBase = (): string | undefined => {
   const env = webSocketBaseUrl();
   if (env) return env;
   if (typeof window !== 'undefined' && window.location) {
@@ -37,7 +37,7 @@ let active: MatchTransport | null = null;
 
 export const getMatchTransport = (): MatchTransport => {
   if (active) return active;
-  const base = resolveWsBase();
+  const base = getRelayBase();
   active = base ? new WebSocketTransport(base) : new BroadcastChannelTransport();
   return active;
 };
