@@ -15,7 +15,7 @@
 
 import { WebSocketServer } from 'ws';
 
-const PREROLL_MS = Number(process.env.RELAY_PREROLL_MS) || 12_000;
+const PREROLL_MS = Number(process.env.RELAY_PREROLL_MS) || 9_000;
 const DURATION_MS = Number(process.env.RELAY_DURATION_MS) || 30_000;
 const LEVERAGE = 120;
 const PUSH_EPS = 0.01;

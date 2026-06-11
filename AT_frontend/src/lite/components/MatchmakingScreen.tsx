@@ -5,7 +5,7 @@ import { Screen, TopBar, Logo, Avatar, BigButton } from './ui';
 import { getMatchTransport } from '../transport';
 
 const BOT_DELAY_MS = 1300;
-const P2P_TIMEOUT_MS = 7000;
+const P2P_TIMEOUT_MS = 15000;
 
 const Body = styled.div`
   flex: 1;

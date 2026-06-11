@@ -18,8 +18,8 @@ import {
 } from './types';
 
 const MM_CHANNEL = 'bitmatch:mm:v1';
-const PREROLL_MS = 12_000; // arming buffer: time for both clients + the 10s pick
-const SEEK_EVERY_MS = 700;
+const PREROLL_MS = 9_000; // arming buffer (load + pick)
+const SEEK_EVERY_MS = 600;
 
 type SeekMsg = { k: 'seek'; clientId: string; name: string; avatar: string };
 type PairMsg = {

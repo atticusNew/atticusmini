@@ -194,6 +194,17 @@ export const P2PMatchScreen: React.FC = () => {
     }
   }, [phase, liveStartAt, spot, now, expiryAt, setMatch, commitResult]);
 
+  // Register the pick immediately on the scoreboard (entry price still locks at
+  // the shared liveStart for fairness; status stays 'idle' until then).
+  const pick = useCallback((dir: Direction) => {
+    setChosenDir(dir);
+    haptics.tap();
+    const m = matchRef.current;
+    if (m && m.you.status === 'idle' && m.you.direction !== dir) {
+      setMatch({ ...m, you: { ...m.you, direction: dir } });
+    }
+  }, [setMatch]);
+
   const sellYou = useCallback(() => {
     const m = matchRef.current;
     if (!m || !peer || m.you.status !== 'open') return;
@@ -302,10 +313,10 @@ export const P2PMatchScreen: React.FC = () => {
 
         {phase === 'arming' ? (
           <DirRow>
-            <BigButton tone="up" disabled={spot <= 0} onClick={() => { setChosenDir('up'); haptics.tap(); }}
+            <BigButton tone="up" disabled={spot <= 0} onClick={() => pick('up')}
               aria-label="Bet BTC goes higher"
               style={chosenDir === 'up' ? undefined : { opacity: chosenDir ? 0.6 : 1 }}>▲ HIGH</BigButton>
-            <BigButton tone="down" disabled={spot <= 0} onClick={() => { setChosenDir('down'); haptics.tap(); }}
+            <BigButton tone="down" disabled={spot <= 0} onClick={() => pick('down')}
               aria-label="Bet BTC goes lower"
               style={chosenDir === 'down' ? undefined : { opacity: chosenDir ? 0.6 : 1 }}>▼ LOW</BigButton>
           </DirRow>
