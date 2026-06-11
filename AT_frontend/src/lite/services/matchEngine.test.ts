@@ -38,20 +38,20 @@ test('idle side has zero PnL', () => {
   assert.equal(livePnlUSD(m.you, 100_000), 0);
 });
 
-test('strike sits beyond entry; profit only once price crosses it', () => {
+test('strike equals entry; profit is the directional move from it', () => {
   const m = baseMatch();
   const you = openSide(m.you, 'up', 100_000);
   const strike = strikeFor(100_000, 'up');
   assert.equal(you.strikeUSD, strike);
-  assert.ok(strike > 100_000); // HIGH strike is above entry — a real hurdle
+  assert.equal(strike, 100_000); // dot sits on the price line at entry
 
-  // At entry (below strike) → out of the money, slightly negative.
-  assert.ok(livePnlUSD(you, 100_000) < 0);
+  // At entry → flat, not yet in the money.
+  assert.equal(livePnlUSD(you, 100_000), 0);
   assert.equal(isInTheMoney(you, 100_000), false);
 
-  // Once past the strike → in the money, scaled by leverage vs the strike.
+  // Above entry → in the money, scaled by leverage.
   const spot = 101_000;
-  const expected = (10 * LITE_LEVERAGE * (spot - strike)) / 100_000;
+  const expected = (10 * LITE_LEVERAGE * (spot - 100_000)) / 100_000;
   assert.ok(Math.abs(livePnlUSD(you, spot) - expected) < 1e-6);
   assert.equal(isInTheMoney(you, spot), true);
 });

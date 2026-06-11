@@ -29,12 +29,12 @@ import type {
 export const LITE_LEVERAGE = 120;
 
 /**
- * Strike barrier distance from entry, as a fraction of spot. The strike sits
- * this far beyond entry in the chosen direction, so price must cross it to
- * turn a profit — making the strike a meaningful price factor. ~0.045% of spot
- * is a beatable-but-real hurdle over a 30s BTC window.
+ * Strike = the entry price. The trader's marker sits exactly on the price line
+ * where they entered, and profit is the directional move away from that point.
+ * (Kept as a function + constant so a barrier offset can be reintroduced later
+ * without touching call sites.)
  */
-export const STRIKE_OFFSET_PCT = 0.00045;
+export const STRIKE_OFFSET_PCT = 0;
 
 /** Strike price for a side entering at `spot` going `direction`. */
 export const strikeFor = (spot: number, direction: Direction): number =>

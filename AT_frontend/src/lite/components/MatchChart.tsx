@@ -1,16 +1,15 @@
 /**
- * MatchChart — pixel-accurate SVG over a real NYC skyline photo.
+ * MatchChart — a plain stock chart over a NYC skyline.
  *
- * LIVE model (what the trader sees):
- *  - The current price is pinned at a fixed point ~62% across; history scrolls
- *    in from the left, so the line "moves" as time passes.
- *  - To the right of the price is the remaining-time runway. A vertical EXPIRY
- *    line sits at its end and slides LEFT toward the price as the clock runs
- *    out ("closing in").
- *  - Each trader has a colored dot + horizontal STRIKE line (gold = you, cyan =
- *    opponent) running to the expiry line, so the lines shorten as it closes in.
+ * LIVE: a fixed 30s window. x maps time left→right (left = match start, right =
+ * expiry "time line"). The price line GROWS from the left toward the right as
+ * time passes — exactly like a normal live stock chart. Each trader's marker is
+ * a dot placed ON the price line at the moment they entered, with a horizontal
+ * line at that price running across to the expiry time line.
  *
- * ARMING: simple right-anchored scroll (covered by the pick-clock overlay).
+ * ARMING: simple right-anchored preview (covered by the pick-clock overlay).
+ *
+ * The match countdown lives in the header, not on the chart.
  */
 
 import React from 'react';
@@ -48,8 +47,7 @@ const Wrap = styled.div`
   background: #1b2150 url('/images/lite-nyc-skyline.png') center bottom / cover no-repeat;
 `;
 
-const PAD = 10;
-const FRONT_FRAC = 0.62;
+const PAD = 12;
 const YOU_COLOR = '#ffd23f';
 const OPP_COLOR = '#41d7ff';
 
@@ -66,30 +64,35 @@ export const MatchChart: React.FC<MatchChartProps> = ({
 
   const left = PAD;
   const right = W - PAD;
-  const frontX = live ? left + (right - left) * FRONT_FRAC : right;
+  const innerW = Math.max(1, right - left);
 
   const priceVals = [...series.map(s => s.p), ...strikes.map(s => s.price), spot].filter(v => v > 0);
   const lo = priceVals.length ? Math.min(...priceVals) : (spot || 0);
   const hi = priceVals.length ? Math.max(...priceVals) : (spot || 1);
   const span = Math.max(hi - lo, Math.max(hi * 0.0006, 1));
-  const padSpan = span * 0.4;
+  const padSpan = span * 0.45;
   const yLo = lo - padSpan;
   const yHi = hi + padSpan;
   const yOf = (p: number): number => PAD + (1 - (p - yLo) / (yHi - yLo)) * (H - 2 * PAD);
 
-  // History scrolls so the newest price sits at frontX.
-  const pxPerMs = (frontX - left) / durMs;
-  const xOf = (t: number): number => frontX - (now - t) * pxPerMs;
+  // LIVE: fixed window, time → x (start at left, expiry at right).
+  // ARMING: right-anchored scroll.
+  const xOf = (t: number): number => {
+    if (live && windowStart != null) {
+      const frac = Math.min(1, Math.max(0, (t - windowStart) / durMs));
+      return left + frac * innerW;
+    }
+    return right - (now - t) * (innerW / durMs);
+  };
 
-  const elapsedSec = live && windowStart != null ? Math.max(0, (now - windowStart) / 1000) : 0;
-  const remainingSec = Math.max(0, durationSec - elapsedSec);
-  const expiryX = frontX + (remainingSec / durationSec) * (right - frontX);
-
+  const frontX = live && windowStart != null
+    ? left + Math.min(1, Math.max(0, (now - windowStart) / durMs)) * innerW
+    : right;
   const spotY = yOf(spot || hi);
 
   const pathPts = series
     .map(s => ({ x: xOf(s.t), y: yOf(s.p) }))
-    .filter(pt => pt.x >= left - 2 && pt.x <= frontX + 2);
+    .filter(pt => pt.x >= left - 2 && pt.x <= right + 2);
   const linePts = pathPts.map(pt => `${pt.x.toFixed(1)},${pt.y.toFixed(1)}`).join(' ');
   const areaPts = pathPts.length > 1
     ? `${pathPts[0]!.x.toFixed(1)},${(H - PAD).toFixed(1)} ${linePts} ${pathPts[pathPts.length - 1]!.x.toFixed(1)},${(H - PAD).toFixed(1)}`
@@ -100,41 +103,39 @@ export const MatchChart: React.FC<MatchChartProps> = ({
   return (
     <Wrap ref={ref}>
       {ready && (
-        <svg width={W} height={H} style={{ display: 'block', position: 'relative' }}>
+        <svg width={W} height={H} style={{ display: 'block' }}>
           <defs>
             <linearGradient id="litePriceFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#efe0ff" stopOpacity="0.4" />
+              <stop offset="0%" stopColor="#efe0ff" stopOpacity="0.38" />
               <stop offset="100%" stopColor="#efe0ff" stopOpacity="0" />
             </linearGradient>
           </defs>
 
           {/* Legibility veil over the photo */}
-          <rect x={0} y={0} width={W} height={H} fill="#0b0d18" opacity={0.3} />
+          <rect x={0} y={0} width={W} height={H} fill="#0b0d18" opacity={0.32} />
 
-          {/* Faint gridlines */}
+          {/* Faint price gridlines */}
           {gridLevels.map((p, i) => (
             <line key={i} x1={left} y1={yOf(p)} x2={right} y2={yOf(p)}
               stroke="#ffffff" strokeOpacity={0.09} strokeWidth={1} />
           ))}
 
-          {/* Remaining-time runway (right of price), and expired veil beyond it */}
-          {live && (
-            <rect x={expiryX} y={0} width={Math.max(0, W - expiryX)} height={H}
-              fill="#0b0d18" opacity={0.42} />
-          )}
+          {/* Expiry "time line" at the right edge */}
+          {live && <line x1={right} y1={0} x2={right} y2={H} stroke="var(--down)" strokeWidth={2.5} strokeOpacity={0.85} />}
 
-          {/* Per-trader strike lines (shorten toward the closing expiry) + dots */}
+          {/* Per-trader entry markers: dot ON the line + horizontal line to expiry */}
           {live && strikes.map((s, i) => {
             const color = s.you ? YOU_COLOR : OPP_COLOR;
-            const sy = yOf(s.price);
+            const y = yOf(s.entrySpot);
+            const ex = xOf(s.entryAt);
             const arrow = s.direction === 'up' ? '▲' : '▼';
-            const labelW = (s.you ? 48 : 62);
+            const labelW = s.you ? 46 : 60;
             return (
               <g key={i}>
-                <line x1={left} y1={sy} x2={expiryX} y2={sy} stroke={color} strokeWidth={2.5}
-                  strokeDasharray={s.you ? '0' : '8 5'} />
-                <circle cx={frontX} cy={sy} r={5} fill={color} stroke="#140f28" strokeWidth={2} />
-                <g transform={`translate(${left}, ${sy - 19})`}>
+                <line x1={ex} y1={y} x2={right} y2={y} stroke={color} strokeWidth={2.5}
+                  strokeDasharray={s.you ? '0' : '7 5'} strokeOpacity={0.95} />
+                <circle cx={ex} cy={y} r={5.5} fill={color} stroke="#140f28" strokeWidth={2} />
+                <g transform={`translate(${Math.min(ex, right - labelW)}, ${y - 20})`}>
                   <rect x={0} y={0} width={labelW} height={16} rx={5} fill={color} />
                   <text x={5} y={12} fontSize={10} fontWeight={700} fill="#140f28"
                     style={{ fontFamily: 'var(--font-display)' }}>{arrow} {s.label}</text>
@@ -143,7 +144,7 @@ export const MatchChart: React.FC<MatchChartProps> = ({
             );
           })}
 
-          {/* Price area + line */}
+          {/* Price line */}
           {areaPts && <polygon points={areaPts} fill="url(#litePriceFill)" />}
           {pathPts.length > 1 && (
             <polyline points={linePts} fill="none" stroke="#efe0ff" strokeWidth={3}
@@ -153,23 +154,11 @@ export const MatchChart: React.FC<MatchChartProps> = ({
           {/* Current price marker + tag */}
           <circle cx={frontX} cy={spotY} r={6} fill="#fff" stroke="#7b5ea7" strokeWidth={3} />
           {spot > 0 && (
-            <g transform={`translate(${Math.min(frontX + 9, right - 50)}, ${spotY - 9})`}>
-              <rect x={0} y={0} width={50} height={18} rx={5} fill="#2a1f4a" opacity={0.92} />
+            <g transform={`translate(${Math.min(frontX + 9, right - 52)}, ${Math.max(10, spotY - 9)})`}>
+              <rect x={0} y={0} width={52} height={18} rx={5} fill="#2a1f4a" opacity={0.92} />
               <text x={6} y={13} fontSize={10} fontWeight={700} fill="#fff"
                 style={{ fontFamily: 'var(--font-mono)' }}>{fmtPrice(spot)}</text>
             </g>
-          )}
-
-          {/* Closing-in expiry line + countdown */}
-          {live && (
-            <>
-              <line x1={expiryX} y1={0} x2={expiryX} y2={H} stroke="var(--down)" strokeWidth={3} />
-              <g transform={`translate(${expiryX}, 14)`}>
-                <rect x={-15} y={-11} width={30} height={20} rx={5} fill="var(--down)" />
-                <text x={0} y={4} fontSize={11} fontWeight={700} fill="#fff" textAnchor="middle"
-                  style={{ fontFamily: 'var(--font-display)' }}>{Math.ceil(remainingSec)}s</text>
-              </g>
-            </>
           )}
         </svg>
       )}

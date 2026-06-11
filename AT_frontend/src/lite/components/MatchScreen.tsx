@@ -52,42 +52,47 @@ const ScoreSide = styled.div<{ side: 'you' | 'opp'; lead: boolean }>`
   padding: 8px 10px;
   border-radius: 12px;
   align-items: ${p => (p.side === 'opp' ? 'flex-end' : 'flex-start')};
+  border: 2px solid transparent;
+  /* Non-jarring lead cue: a soft fade, no size/border layout shift. */
   background: ${p => (p.lead ? 'var(--bg-elev)' : 'transparent')};
-  border: 2px solid ${p => (p.lead ? 'var(--border-strong)' : 'transparent')};
-  transition: 120ms ease-out;
+  box-shadow: ${p => (p.lead ? 'inset 0 0 0 2px var(--accent)' : 'none')};
+  transition: background 220ms ease, box-shadow 220ms ease;
   .name {
     display: flex; align-items: center; gap: 6px;
     flex-direction: ${p => (p.side === 'opp' ? 'row-reverse' : 'row')};
     font-family: var(--font-display); font-weight: 700; font-size: 13px; color: var(--text);
-    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    max-width: 100%; overflow: hidden; white-space: nowrap;
   }
   .dot { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--border-strong); flex-shrink: 0; }
+  .crown { width: 16px; text-align: center; flex-shrink: 0; }
   .pnl { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 800; font-size: 20px; }
 `;
 
 const Vs = styled.div`
   font-family: var(--font-display);
   font-weight: 700;
-  color: #fff;
-  background: var(--purple);
-  border: 2px solid var(--border-strong);
-  border-radius: 999px;
-  padding: 3px 9px;
+  color: var(--text-dim);
   font-size: 13px;
-  box-shadow: 2px 2px 0 var(--border-strong);
 `;
 
-const CenterClock = styled.div<{ tone: 'normal' | 'warn' | 'critical' }>`
+const TopTimer = styled.div<{ tone: 'normal' | 'warn' | 'critical' }>`
   font-family: var(--font-display);
   font-variant-numeric: tabular-nums;
   font-weight: 700;
-  font-size: 34px;
+  font-size: 26px;
   line-height: 1;
-  text-align: center;
   color: ${p => (p.tone === 'critical' ? 'var(--down)' : p.tone === 'warn' ? 'var(--accent)' : 'var(--text)')};
-  -webkit-text-stroke: 0.9px var(--border-strong);
   animation: ${p => (p.tone === 'critical' ? 'litePulse 0.6s ease-in-out infinite' : 'none')};
-  span { font-size: 14px; -webkit-text-stroke: 0; color: var(--text-dim); }
+  span { font-size: 13px; color: var(--text-dim); }
+`;
+
+const TopLabel = styled.div`
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
 `;
 
 const ChartFrame = styled.div`
@@ -250,8 +255,13 @@ export const MatchScreen: React.FC = () => {
   const tone = sec <= 5 ? 'critical' : sec <= 10 ? 'warn' : 'normal';
   const youPnl = effectivePnlUSD(match.you, spot);
   const oppPnl = match.mode === 'pvp' ? effectivePnlUSD(match.opp, spot) : 0;
-  const youLead = match.mode === 'solo' ? youPnl > 0 : youPnl >= oppPnl;
-  const oppLead = match.mode === 'pvp' && !youLead;
+  // Deadband so the lead doesn't flicker when PnLs are near-equal.
+  const LEAD_EPS = 0.05;
+  const leader: 'you' | 'opp' | null = match.mode === 'solo'
+    ? (youPnl > LEAD_EPS ? 'you' : null)
+    : (Math.abs(youPnl - oppPnl) <= LEAD_EPS ? null : (youPnl > oppPnl ? 'you' : 'opp'));
+  const youLead = live && leader === 'you';
+  const oppLead = live && leader === 'opp';
 
   const strikes: StrikeMark[] = [];
   if (match.you.direction && match.you.strikeUSD && match.you.entrySpot && match.you.entryAt) {
@@ -270,10 +280,11 @@ export const MatchScreen: React.FC = () => {
   const renderSide = (side: MatchSide, who: 'you' | 'opp', pnl: number, lead: boolean, color: string, name: string) => {
     const arrow = side.direction === 'up' ? '▲ ' : side.direction === 'down' ? '▼ ' : '';
     return (
-      <ScoreSide side={who} lead={lead && live}>
+      <ScoreSide side={who} lead={lead}>
         <span className="name">
           <span className="dot" style={{ background: color }} />
-          {name}{lead && live ? ' 👑' : ''}
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</span>
+          <span className="crown">{lead ? '👑' : ''}</span>
         </span>
         <span className="pnl" style={{ color: pnl >= 0 ? 'var(--up)' : 'var(--down)' }}>
           {side.direction ? `${arrow}${fmt(pnl)}` : '—'}
@@ -290,6 +301,9 @@ export const MatchScreen: React.FC = () => {
           <Avatar src={match.you.avatar} size={30} />
           <span className="uname">{match.you.name}</span>
         </UserChip>
+        {live
+          ? <TopTimer tone={tone}>{sec}<span>s</span></TopTimer>
+          : <TopLabel>{match.phase === 'arming' ? 'Get ready' : ''}</TopLabel>}
         <Pot>{match.mode === 'pvp' ? <>Wager <span className="v">${match.wagerUSD}</span></> : <>Solo</>}</Pot>
       </TopBar>
 
@@ -319,7 +333,7 @@ export const MatchScreen: React.FC = () => {
 
         <ScoreBar>
           {renderSide(match.you, 'you', youPnl, youLead, YOU_COLOR, match.you.name)}
-          {live ? <CenterClock tone={tone}>{sec}<span>s</span></CenterClock> : <Vs>VS</Vs>}
+          <Vs>VS</Vs>
           {match.mode === 'pvp'
             ? renderSide(match.opp, 'opp', oppPnl, oppLead, OPP_COLOR, match.opp.name)
             : (
