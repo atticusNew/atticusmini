@@ -38,8 +38,33 @@ const PanelHead = styled.div`
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  .label { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-dim); }
-  .val { font-family: var(--font-display); font-variant-numeric: tabular-nums; font-weight: 700; font-size: 26px; color: var(--accent); -webkit-text-stroke: 0.6px var(--border-strong); }
+  gap: 8px;
+  .label { font-family: var(--font-display); font-weight: 700; font-size: 17px; color: var(--text); }
+  .hint { font-size: 11px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--text-dim); text-align: right; }
+`;
+
+const ValueRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  .val {
+    flex: 1;
+    text-align: center;
+    font-family: var(--font-display);
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    font-size: 36px;
+    color: var(--accent);
+    -webkit-text-stroke: 0.9px var(--border-strong);
+  }
+  button {
+    appearance: none; cursor: pointer; width: 48px; height: 48px;
+    border-radius: 14px; border: 2px solid var(--border-strong);
+    background: var(--bg-elev-2); color: var(--text); font-size: 26px; font-weight: 700;
+    box-shadow: 2px 2px 0 var(--border-strong);
+  }
+  button:active:not(:disabled) { transform: translate(2px,2px); box-shadow: none; }
+  button:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
 `;
 
 const Chips = styled.div`
@@ -52,7 +77,7 @@ const Chip = styled.button<{ active: boolean }>`
   appearance: none;
   cursor: pointer;
   border-radius: 12px;
-  padding: 12px 4px;
+  padding: 11px 4px;
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-weight: 800;
@@ -65,18 +90,18 @@ const Chip = styled.button<{ active: boolean }>`
   &:active { transform: translate(2px, 2px); box-shadow: none; }
 `;
 
-const Stepper = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  button {
-    appearance: none; cursor: pointer; width: 42px; height: 42px;
-    border-radius: 12px; border: 2px solid var(--border-strong);
-    background: var(--bg-elev-2); color: var(--text); font-size: 22px; font-weight: 700;
-    box-shadow: 2px 2px 0 var(--border-strong);
-  }
-  button:active:not(:disabled) { transform: translate(2px,2px); box-shadow: none; }
-  button:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+const DepositLink = styled.button`
+  appearance: none;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 13px;
+  text-decoration: underline;
+  padding: 6px;
+  align-self: center;
 `;
 
 const WAGER_CHIPS = [2, 10, 25, 50];
@@ -119,52 +144,47 @@ export const LobbyScreen: React.FC = () => {
 
         <Panel>
           <PanelHead>
-            <span className="label">Wager (winner takes)</span>
-            <span className="val">${wagerUSD}</span>
+            <span className="label">Wager</span>
+            <span className="hint">winner takes · max ${MAX_WAGER_USD}</span>
           </PanelHead>
+          <ValueRow>
+            <button onClick={() => setWager(wagerUSD - 1)} disabled={wagerUSD <= MIN_WAGER_USD}>−</button>
+            <span className="val">${wagerUSD}</span>
+            <button onClick={() => setWager(wagerUSD + 1)} disabled={wagerUSD >= MAX_WAGER_USD}>+</button>
+          </ValueRow>
           <Chips>
             {WAGER_CHIPS.map(v => (
               <Chip key={v} active={wagerUSD === v} onClick={() => setWager(v)}>${v}</Chip>
             ))}
           </Chips>
-          <Stepper>
-            <button onClick={() => setWager(wagerUSD - 1)} disabled={wagerUSD <= MIN_WAGER_USD}>−</button>
-            <div style={{ flex: 1, textAlign: 'center', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
-              ${wagerUSD} <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>/ max ${MAX_WAGER_USD}</span>
-            </div>
-            <button onClick={() => setWager(wagerUSD + 1)} disabled={wagerUSD >= MAX_WAGER_USD}>+</button>
-          </Stepper>
         </Panel>
 
         <Panel>
           <PanelHead>
-            <span className="label">Your trade size</span>
-            <span className="val">${amountUSD}</span>
+            <span className="label">Trade size</span>
+            <span className="hint">your stake each round · max ${MAX_AMOUNT_USD}</span>
           </PanelHead>
+          <ValueRow>
+            <button onClick={() => setAmount(amountUSD - 1)} disabled={amountUSD <= MIN_AMOUNT_USD}>−</button>
+            <span className="val">${amountUSD}</span>
+            <button onClick={() => setAmount(amountUSD + 1)} disabled={amountUSD >= MAX_AMOUNT_USD}>+</button>
+          </ValueRow>
           <Chips>
             {AMOUNT_CHIPS.map(v => (
               <Chip key={v} active={amountUSD === v} onClick={() => setAmount(v)}>${v}</Chip>
             ))}
           </Chips>
-          <Stepper>
-            <button onClick={() => setAmount(amountUSD - 1)} disabled={amountUSD <= MIN_AMOUNT_USD}>−</button>
-            <div style={{ flex: 1, textAlign: 'center', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
-              ${amountUSD} <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>/ max ${MAX_AMOUNT_USD}</span>
-            </div>
-            <button onClick={() => setAmount(amountUSD + 1)} disabled={amountUSD >= MAX_AMOUNT_USD}>+</button>
-          </Stepper>
         </Panel>
 
-        <div style={{ flex: 1 }} />
+        <div style={{ flex: 1, minHeight: 8 }} />
 
-        <BigButton onClick={openSwipe}>Swipe to find an opponent</BigButton>
-        <BigButton tone="ghost" onClick={startSolo}>Solo trade ($)</BigButton>
-        <BigButton
-          tone="ghost"
+        <BigButton onClick={openSwipe}>🔥 Find an opponent</BigButton>
+        <BigButton tone="ghost" onClick={startSolo}>Solo practice</BigButton>
+        <DepositLink
           onClick={() => { setDepositing(true); deposit(1000); setTimeout(() => setDepositing(false), 600); }}
         >
-          {depositing ? 'Funds added ✓' : 'Deposit funds (demo +$1,000)'}
-        </BigButton>
+          {depositing ? 'Funds added ✓' : '+ Add demo funds'}
+        </DepositLink>
       </ScreenBody>
     </Screen>
   );

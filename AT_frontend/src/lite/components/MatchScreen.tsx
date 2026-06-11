@@ -4,7 +4,7 @@ import { useLiteSession } from '../state/LiteSessionProvider';
 import { useSynchronizedPrice } from '../../hooks/useGlobalPriceFeed';
 import { pricingEngine } from '../../services/OffChainPricingEngine';
 import { useNow } from '../hooks/useNow';
-import { MatchChart } from './MatchChart';
+import { MatchChart, type StrikeMark } from './MatchChart';
 import { Screen, TopBar, Brand, Avatar, BigButton } from './ui';
 import {
   bothClosed, closeSide, effectivePnlUSD, isExpired, livePnlUSD, openSide,
@@ -55,7 +55,7 @@ const Timer = styled.div<{ tone: 'normal' | 'warn' | 'critical' }>`
   font-family: var(--font-display);
   font-variant-numeric: tabular-nums;
   font-weight: 700;
-  font-size: 54px;
+  font-size: 40px;
   text-align: center;
   line-height: 1;
   color: ${p => (p.tone === 'critical' ? 'var(--down)' : p.tone === 'warn' ? 'var(--accent)' : 'var(--text)')};
@@ -110,10 +110,13 @@ export const MatchScreen: React.FC = () => {
   const { priceState } = useSynchronizedPrice();
   const spot = priceState.current;
   const live = match?.phase === 'live';
-  const now = useNow(250, live);
+  const now = useNow(120, live);
 
   const seriesRef = useRef<Array<{ t: number; p: number }>>([]);
   const settledRef = useRef(false);
+  // Bot waits a beat before entering so its strike line lands at a different
+  // price than yours — two distinct lines, and the late entry is a real edge.
+  const botDelayMsRef = useRef(0);
 
   // Capture the price path during the live window for the chart.
   useEffect(() => {
@@ -127,16 +130,11 @@ export const MatchScreen: React.FC = () => {
       if (!match || match.phase !== 'arming' || spot <= 0) return;
       seriesRef.current = [{ t: Date.now(), p: spot }];
       settledRef.current = false;
+      botDelayMsRef.current = 600 + Math.random() * 1800; // 0.6–2.4s
       const you = openSide(match.you, dir, spot);
-      let opp = match.opp;
-      if (match.mode === 'pvp') {
-        const od = chooseDirection(recentReturn(), opponent?.skill ?? 0.5);
-        opp = openSide(match.opp, od, spot);
-      }
       setMatch({
         ...match,
         you,
-        opp,
         entrySpot: spot,
         startedAt: Date.now(),
         phase: 'live',
@@ -155,6 +153,13 @@ export const MatchScreen: React.FC = () => {
     if (!match || match.phase !== 'live' || spot <= 0 || settledRef.current) return;
 
     let next = match;
+    const elapsedMs = match.startedAt != null ? now - match.startedAt : 0;
+
+    // Bot enters after its delay (creates a second, distinct strike line).
+    if (match.mode === 'pvp' && opponent && next.opp.status === 'idle' && elapsedMs >= botDelayMsRef.current) {
+      const od = chooseDirection(recentReturn(), opponent.skill);
+      next = { ...next, opp: openSide(next.opp, od, spot) };
+    }
 
     if (match.mode === 'pvp' && opponent && next.opp.status === 'open') {
       const sec = secondsRemaining(next, now);
@@ -191,6 +196,14 @@ export const MatchScreen: React.FC = () => {
 
   const dirLabel = (d: Direction | null): string =>
     d === 'up' ? '▲ HIGH' : d === 'down' ? '▼ LOW' : '—';
+
+  const strikes: StrikeMark[] = [];
+  if (match.you.direction && match.you.entrySpot) {
+    strikes.push({ price: match.you.entrySpot, direction: match.you.direction, label: 'YOU', you: true });
+  }
+  if (match.mode === 'pvp' && match.opp.direction && match.opp.entrySpot) {
+    strikes.push({ price: match.opp.entrySpot, direction: match.opp.direction, label: match.opp.name, you: false });
+  }
 
   return (
     <Screen>
@@ -230,7 +243,14 @@ export const MatchScreen: React.FC = () => {
 
         <Timer tone={tone}>{sec}s</Timer>
 
-        <MatchChart series={seriesRef.current} entrySpot={match.entrySpot} spot={spot} />
+        <MatchChart
+          series={seriesRef.current}
+          now={now}
+          windowStart={match.startedAt}
+          durationSec={match.durationSec}
+          spot={spot}
+          strikes={strikes}
+        />
 
         <PnlRow>
           <PnlCard lead={youLead}>
@@ -244,8 +264,6 @@ export const MatchScreen: React.FC = () => {
             </div>
           </PnlCard>
         </PnlRow>
-
-        <div style={{ flex: 1 }} />
 
         {match.phase === 'arming' ? (
           <>

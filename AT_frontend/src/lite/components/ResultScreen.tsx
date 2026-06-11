@@ -46,7 +46,7 @@ const Breakdown = styled.div`
 const fmt = (n: number): string => `${n >= 0 ? '+' : '−'}$${Math.abs(n).toFixed(2)}`;
 
 export const ResultScreen: React.FC = () => {
-  const { match, balance, rematch, goLobby } = useLiteSession();
+  const { match, balance, rematch, openSwipe, goLobby } = useLiteSession();
   const result = match?.result;
 
   if (!match || !result) {
@@ -94,7 +94,10 @@ export const ResultScreen: React.FC = () => {
 
         <div style={{ height: 8 }} />
 
-        <BigButton onClick={rematch}>Re-MATCH ✓</BigButton>
+        <BigButton onClick={rematch}>
+          {match.mode === 'pvp' ? `Re-MATCH ${match.opp.name} ✓` : 'Trade again ✓'}
+        </BigButton>
+        <BigButton tone="up" onClick={openSwipe}>🔥 Find new opponent</BigButton>
         <BigButton tone="ghost" onClick={goLobby}>Back to lobby</BigButton>
       </Body>
     </Screen>
