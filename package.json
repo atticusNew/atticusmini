@@ -8,5 +8,8 @@
     "start": "node server.mjs",
     "preview": "cd AT_frontend && npm run preview",
     "typecheck": "cd AT_frontend && npm run typecheck"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
   }
 }

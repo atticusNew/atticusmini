@@ -4,6 +4,7 @@
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve } from 'node:path';
+import { attachMatchRelay } from './relay.mjs';
 
 const ROOT = resolve(process.cwd(), 'dist');
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
@@ -100,6 +101,10 @@ const server = createServer(async (req, res) => {
   await send(res, 404);
 });
 
+// Attach the bitMATCH P2P relay (WebSocket) on the same origin:
+//   /matchmake  and  /room/:matchId
+attachMatchRelay(server);
+
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`atticusmini static server listening on :${PORT} (root=${ROOT})`);
+  console.log(`atticusmini static server + match relay listening on :${PORT} (root=${ROOT})`);
 });
