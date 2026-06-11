@@ -73,6 +73,13 @@ export interface MatchSide {
   amountUSD: number;
   /** Spot captured when this side opened its position. */
   entrySpot: number | null;
+  /**
+   * Strike barrier the side is measured against — set just beyond entry in the
+   * chosen direction (entry + offset for HIGH, entry − offset for LOW). Price
+   * must push PAST this line to move into profit, so the strike is a real
+   * price factor, not just the entry.
+   */
+  strikeUSD: number | null;
   status: SideStatus;
   /** Realized PnL once the side is closed (sold early or settled at expiry). */
   realizedPnlUSD: number | null;

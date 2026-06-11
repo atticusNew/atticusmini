@@ -7,7 +7,7 @@ import { useNow } from '../hooks/useNow';
 import { MatchChart, type StrikeMark } from './MatchChart';
 import { Screen, TopBar, Brand, Avatar, BigButton } from './ui';
 import {
-  bothClosed, closeSide, effectivePnlUSD, isExpired, livePnlUSD, openSide,
+  bothClosed, closeSide, effectivePnlUSD, isExpired, isInTheMoney, livePnlUSD, openSide,
   secondsRemaining, settleMatch,
 } from '../services/matchEngine';
 import { chooseDirection, shouldSell } from '../services/botStrategy';
@@ -79,6 +79,7 @@ const PnlCard = styled.div<{ lead: boolean }>`
   transition: 120ms ease-out;
   .who { font-size: 12px; color: var(--text); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.7; }
   .pnl { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 800; font-size: 24px; margin-top: 4px; }
+  .tag { font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-top: 3px; }
 `;
 
 const Pot = styled.div`
@@ -198,12 +199,21 @@ export const MatchScreen: React.FC = () => {
     d === 'up' ? '▲ HIGH' : d === 'down' ? '▼ LOW' : '—';
 
   const strikes: StrikeMark[] = [];
-  if (match.you.direction && match.you.entrySpot) {
-    strikes.push({ price: match.you.entrySpot, direction: match.you.direction, label: 'YOU', you: true });
+  if (match.you.direction && match.you.strikeUSD) {
+    strikes.push({ price: match.you.strikeUSD, direction: match.you.direction, label: 'YOU', you: true });
   }
-  if (match.mode === 'pvp' && match.opp.direction && match.opp.entrySpot) {
-    strikes.push({ price: match.opp.entrySpot, direction: match.opp.direction, label: match.opp.name, you: false });
+  if (match.mode === 'pvp' && match.opp.direction && match.opp.strikeUSD) {
+    strikes.push({ price: match.opp.strikeUSD, direction: match.opp.direction, label: match.opp.name, you: false });
   }
+
+  const youITM = isInTheMoney(match.you, spot);
+  const oppITM = isInTheMoney(match.opp, spot);
+
+  // During arming, show recent live history so the chart isn't empty; once the
+  // trade starts, switch to the captured window so the deadline can close in.
+  const chartSeries = live
+    ? seriesRef.current
+    : pricingEngine.getPriceHistory(0.6).map(h => ({ t: h.timestamp, p: h.price }));
 
   return (
     <Screen>
@@ -244,8 +254,9 @@ export const MatchScreen: React.FC = () => {
         <Timer tone={tone}>{sec}s</Timer>
 
         <MatchChart
-          series={seriesRef.current}
+          series={chartSeries}
           now={now}
+          live={live}
           windowStart={match.startedAt}
           durationSec={match.durationSec}
           spot={spot}
@@ -256,12 +267,22 @@ export const MatchScreen: React.FC = () => {
           <PnlCard lead={youLead}>
             <div className="who">You</div>
             <div className="pnl" style={{ color: youPnl >= 0 ? 'var(--up)' : 'var(--down)' }}>{fmt(youPnl)}</div>
+            {live && match.you.direction && (
+              <div className="tag" style={{ color: youITM ? 'var(--up)' : 'var(--down)' }}>
+                {youITM ? '● in the money' : '○ out'}
+              </div>
+            )}
           </PnlCard>
           <PnlCard lead={!youLead && match.mode === 'pvp'}>
             <div className="who">{match.mode === 'pvp' ? match.opp.name : 'Target'}</div>
             <div className="pnl" style={{ color: oppPnl >= 0 ? 'var(--up)' : 'var(--down)' }}>
               {match.mode === 'pvp' ? fmt(oppPnl) : '$0.00'}
             </div>
+            {live && match.mode === 'pvp' && match.opp.direction && (
+              <div className="tag" style={{ color: oppITM ? 'var(--up)' : 'var(--down)' }}>
+                {oppITM ? '● in the money' : '○ out'}
+              </div>
+            )}
           </PnlCard>
         </PnlRow>
 

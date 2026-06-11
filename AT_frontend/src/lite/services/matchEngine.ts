@@ -26,7 +26,21 @@ import type {
 } from '../types';
 
 /** Amplifies sub-1% 30s BTC moves into an engaging PnL swing. */
-export const LITE_LEVERAGE = 100;
+export const LITE_LEVERAGE = 120;
+
+/**
+ * Strike barrier distance from entry, as a fraction of spot. The strike sits
+ * this far beyond entry in the chosen direction, so price must cross it to
+ * turn a profit — making the strike a meaningful price factor. ~0.045% of spot
+ * is a beatable-but-real hurdle over a 30s BTC window.
+ */
+export const STRIKE_OFFSET_PCT = 0.00045;
+
+/** Strike price for a side entering at `spot` going `direction`. */
+export const strikeFor = (spot: number, direction: Direction): number =>
+  direction === 'up'
+    ? spot * (1 + STRIKE_OFFSET_PCT)
+    : spot * (1 - STRIKE_OFFSET_PCT);
 
 /** PnL deltas below this (USD) are treated as flat for tie detection. */
 export const PNL_EPSILON = 0.01;
@@ -46,17 +60,26 @@ export const clampWager = (n: number): number =>
 const sign = (d: Direction): number => (d === 'up' ? 1 : -1);
 
 /**
- * Mark-to-spot PnL for a side at a given spot. Returns 0 until the side has
- * an entry + direction. Downside is floored at -amountUSD (you can't lose
- * more than you staked); upside is uncapped over the window.
+ * Mark-to-spot PnL for a side at a given spot, measured against the STRIKE
+ * (not the raw entry). Price must cross the strike in the chosen direction to
+ * turn green. Returns 0 until the side has an entry + direction. Downside is
+ * floored at -amountUSD (you can't lose more than you staked); upside is
+ * uncapped over the window.
  */
 export const livePnlUSD = (side: MatchSide, spot: number): number => {
   if (side.direction == null || side.entrySpot == null || side.entrySpot <= 0) {
     return 0;
   }
-  const ret = (spot - side.entrySpot) / side.entrySpot;
+  const strike = side.strikeUSD ?? side.entrySpot;
+  const ret = (spot - strike) / side.entrySpot;
   const raw = side.amountUSD * LITE_LEVERAGE * sign(side.direction) * ret;
   return Math.max(-side.amountUSD, raw);
+};
+
+/** True when price is on the winning side of the strike for this side. */
+export const isInTheMoney = (side: MatchSide, spot: number): boolean => {
+  if (side.direction == null || side.strikeUSD == null) return false;
+  return side.direction === 'up' ? spot > side.strikeUSD : spot < side.strikeUSD;
 };
 
 /**
@@ -80,6 +103,7 @@ export const makeSide = (
   direction: null,
   amountUSD: clampAmount(amountUSD),
   entrySpot: null,
+  strikeUSD: null,
   status: 'idle',
   realizedPnlUSD: null,
   closedAt: null,
@@ -115,7 +139,13 @@ export const openSide = (
   spot: number,
 ): MatchSide => {
   if (side.status !== 'idle') return side;
-  return { ...side, direction, entrySpot: spot, status: 'open' };
+  return {
+    ...side,
+    direction,
+    entrySpot: spot,
+    strikeUSD: strikeFor(spot, direction),
+    status: 'open',
+  };
 };
 
 /** Lock a side's PnL at the given spot (the "sell"). No-op unless open. */

@@ -7,11 +7,13 @@ import {
   createMatch,
   effectivePnlUSD,
   isExpired,
+  isInTheMoney,
   livePnlUSD,
   LITE_LEVERAGE,
   openSide,
   secondsRemaining,
   settleMatch,
+  strikeFor,
 } from './matchEngine';
 
 const baseMatch = () =>
@@ -36,12 +38,22 @@ test('idle side has zero PnL', () => {
   assert.equal(livePnlUSD(m.you, 100_000), 0);
 });
 
-test('up position profits when spot rises, scaled by leverage', () => {
+test('strike sits beyond entry; profit only once price crosses it', () => {
   const m = baseMatch();
   const you = openSide(m.you, 'up', 100_000);
-  // +1% move on $10 at LITE_LEVERAGE → 10 * lev * 0.01
-  const pnl = livePnlUSD(you, 101_000);
-  assert.ok(Math.abs(pnl - 10 * LITE_LEVERAGE * 0.01) < 1e-6);
+  const strike = strikeFor(100_000, 'up');
+  assert.equal(you.strikeUSD, strike);
+  assert.ok(strike > 100_000); // HIGH strike is above entry — a real hurdle
+
+  // At entry (below strike) → out of the money, slightly negative.
+  assert.ok(livePnlUSD(you, 100_000) < 0);
+  assert.equal(isInTheMoney(you, 100_000), false);
+
+  // Once past the strike → in the money, scaled by leverage vs the strike.
+  const spot = 101_000;
+  const expected = (10 * LITE_LEVERAGE * (spot - strike)) / 100_000;
+  assert.ok(Math.abs(livePnlUSD(you, spot) - expected) < 1e-6);
+  assert.equal(isInTheMoney(you, spot), true);
 });
 
 test('down position profits when spot falls', () => {
