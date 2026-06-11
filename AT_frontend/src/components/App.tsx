@@ -8,6 +8,7 @@ import { ToastProvider } from './ToastProvider';
 import { DemoBanner } from './DemoBanner';
 import { AdminPage } from './admin/AdminPage';
 import { GlobalTheme } from '../ui/GlobalTheme';
+import { LiteApp } from '../lite/LiteApp';
 
 const LoadingContainer = styled.div`
   display: flex;
@@ -36,6 +37,16 @@ const LoadingText = styled.p`
 const isAdminRoute = (): boolean => {
   if (typeof window === 'undefined') return false;
   return window.location.pathname.replace(/\/+$/, '') === '/admin';
+};
+
+/**
+ * Atticus Lite (v2) lives at `/lite`. It is fully self-contained (own session
+ * provider + state machine) so the main "Micro Options" app at `/` is never
+ * disrupted by it.
+ */
+const isLiteRoute = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  return window.location.pathname.replace(/\/+$/, '').startsWith('/lite');
 };
 
 const AppContent: React.FC = () => {
@@ -77,7 +88,14 @@ const AppContent: React.FC = () => {
   );
 };
 
-export const App: React.FC = () => (
+export const App: React.FC = () => {
+  if (isLiteRoute()) {
+    return <LiteApp />;
+  }
+  return <MainApp />;
+};
+
+const MainApp: React.FC = () => (
   <CanisterProvider>
     <AuthProvider>
       <BalanceProvider>
