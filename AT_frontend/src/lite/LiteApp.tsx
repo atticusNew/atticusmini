@@ -17,6 +17,7 @@ import { LobbyScreen } from './components/LobbyScreen';
 import { SwipeDeck } from './components/SwipeDeck';
 import { MatchmakingScreen } from './components/MatchmakingScreen';
 import { MatchScreen } from './components/MatchScreen';
+import { P2PMatchScreen } from './components/P2PMatchScreen';
 import { ResultScreen } from './components/ResultScreen';
 
 const LiteRouter: React.FC = () => {
@@ -28,6 +29,7 @@ const LiteRouter: React.FC = () => {
     case 'swipe': return <SwipeDeck />;
     case 'matchmaking': return <MatchmakingScreen />;
     case 'match': return <MatchScreen />;
+    case 'p2pmatch': return <P2PMatchScreen />;
     case 'result': return <ResultScreen />;
     default: return <LobbyScreen />;
   }

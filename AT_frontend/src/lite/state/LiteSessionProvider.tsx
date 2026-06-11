@@ -22,6 +22,7 @@ import {
 } from '../services/profileService';
 import { liteWallet } from '../services/liteWallet';
 import { drawOpponents } from '../services/opponentService';
+import type { MatchmakeResult, Room } from '../transport';
 import {
   clampAmount,
   clampWager,
@@ -35,6 +36,7 @@ export type LiteScreen =
   | 'swipe'
   | 'matchmaking'
   | 'match'
+  | 'p2pmatch'
   | 'result';
 
 interface LiteSessionValue {
@@ -46,6 +48,10 @@ interface LiteSessionValue {
   deck: Opponent[];
   opponent: Opponent | null;
   match: MatchState | null;
+  /** Set during a live P2P duel: the realtime room + shared schedule. */
+  peer: { room: Room; info: MatchmakeResult } | null;
+  /** Which kind of opponent the matchmaking screen is finding. */
+  matchmakeMode: 'p2p' | 'bot';
 
   start: () => void;
   signUp: () => void;
@@ -60,6 +66,9 @@ interface LiteSessionValue {
   openSwipe: () => void;
   challenge: (opp: Opponent) => void;
   enterMatch: () => void;
+  quickMatch: () => void;
+  beginP2PMatch: (res: MatchmakeResult, room: Room) => void;
+  beginBotFallback: () => void;
   startSolo: () => void;
   setMatch: (m: MatchState) => void;
   commitResult: (result: MatchResult) => void;
@@ -87,6 +96,8 @@ export const LiteSessionProvider: React.FC<{ children: ReactNode }> = ({ childre
   const [deck, setDeck] = useState<Opponent[]>([]);
   const [opponent, setOpponent] = useState<Opponent | null>(null);
   const [match, setMatchState] = useState<MatchState | null>(null);
+  const [peer, setPeer] = useState<{ room: Room; info: MatchmakeResult } | null>(null);
+  const [matchmakeMode, setMatchmakeMode] = useState<'p2p' | 'bot'>('bot');
 
   const start = useCallback(() => {
     setScreen(loadProfile() ? 'lobby' : 'onboarding');
@@ -138,11 +149,16 @@ export const LiteSessionProvider: React.FC<{ children: ReactNode }> = ({ childre
     setBalance(liteWallet.deposit(amount));
   }, []);
 
+  const closePeer = useCallback(() => {
+    setPeer(prev => { if (prev) { try { prev.room.close(); } catch { /* ignore */ } } return null; });
+  }, []);
+
   const goLobby = useCallback(() => {
     setOpponent(null);
     setMatchState(null);
+    closePeer();
     setScreen('lobby');
-  }, []);
+  }, [closePeer]);
 
   const openSwipe = useCallback(() => {
     setDeck(drawOpponents());
@@ -150,7 +166,7 @@ export const LiteSessionProvider: React.FC<{ children: ReactNode }> = ({ childre
   }, []);
 
   const buildMatch = useCallback(
-    (mode: 'pvp' | 'solo', opp: Opponent | null): MatchState =>
+    (mode: 'pvp' | 'solo', opp: { name: string; avatar: string } | null): MatchState =>
       createMatch({
         id: nextMatchId(),
         mode,
@@ -171,7 +187,9 @@ export const LiteSessionProvider: React.FC<{ children: ReactNode }> = ({ childre
 
   const challenge = useCallback(
     (opp: Opponent) => {
+      setMatchmakeMode('bot');
       setOpponent(opp);
+      setPeer(null);
       setMatchState(buildMatch('pvp', opp));
       setScreen('matchmaking');
     },
@@ -179,6 +197,34 @@ export const LiteSessionProvider: React.FC<{ children: ReactNode }> = ({ childre
   );
 
   const enterMatch = useCallback(() => setScreen('match'), []);
+
+  /** Online P2P quick match — the matchmaking screen drives the transport. */
+  const quickMatch = useCallback(() => {
+    setMatchmakeMode('p2p');
+    setOpponent(null);
+    setPeer(null);
+    setMatchState(null);
+    setScreen('matchmaking');
+  }, []);
+
+  const beginP2PMatch = useCallback(
+    (res: MatchmakeResult, room: Room) => {
+      setPeer({ room, info: res });
+      setMatchState(buildMatch('pvp', res.opponent));
+      setScreen('p2pmatch');
+    },
+    [buildMatch],
+  );
+
+  /** No human found in time — fall back to a bot so the queue never feels dead. */
+  const beginBotFallback = useCallback(() => {
+    const opp = drawOpponents(1)[0] ?? null;
+    setMatchmakeMode('bot');
+    setOpponent(opp);
+    setPeer(null);
+    setMatchState(buildMatch('pvp', opp));
+    setScreen('match');
+  }, [buildMatch]);
 
   const startSolo = useCallback(() => {
     setOpponent(null);
@@ -197,9 +243,10 @@ export const LiteSessionProvider: React.FC<{ children: ReactNode }> = ({ childre
           result.outcome === 'you' ? 'win' : result.outcome === 'opp' ? 'loss' : 'push';
         return recordOutcome(prev, outcome);
       });
+      closePeer();
       setScreen('result');
     },
-    [],
+    [closePeer],
   );
 
   const rematch = useCallback(() => {
@@ -217,6 +264,8 @@ export const LiteSessionProvider: React.FC<{ children: ReactNode }> = ({ childre
       deck,
       opponent,
       match,
+      peer,
+      matchmakeMode,
       start,
       signUp,
       completeOnboarding,
@@ -230,6 +279,9 @@ export const LiteSessionProvider: React.FC<{ children: ReactNode }> = ({ childre
       openSwipe,
       challenge,
       enterMatch,
+      quickMatch,
+      beginP2PMatch,
+      beginBotFallback,
       startSolo,
       setMatch,
       commitResult,
@@ -237,9 +289,11 @@ export const LiteSessionProvider: React.FC<{ children: ReactNode }> = ({ childre
     }),
     [
       screen, profile, balance, wagerUSD, amountUSD, deck, opponent, match,
+      peer, matchmakeMode,
       start, signUp, completeOnboarding, updateProfile, resetBalance, signOut,
       setWager, setAmount, deposit, goLobby, openSwipe,
-      challenge, enterMatch, startSolo, setMatch, commitResult, rematch,
+      challenge, enterMatch, quickMatch, beginP2PMatch, beginBotFallback,
+      startSolo, setMatch, commitResult, rematch,
     ],
   );
 

@@ -110,7 +110,7 @@ const AMOUNT_CHIPS = [5, 10, 25, 50];
 
 export const LobbyScreen: React.FC = () => {
   const {
-    profile, balance, wagerUSD, amountUSD, setWager, setAmount, deposit, openSwipe, startSolo,
+    profile, balance, wagerUSD, amountUSD, setWager, setAmount, deposit, openSwipe, startSolo, quickMatch,
   } = useLiteSession();
   const [depositing, setDepositing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -183,7 +183,8 @@ export const LobbyScreen: React.FC = () => {
 
         <div style={{ flex: 1, minHeight: 8 }} />
 
-        <BigButton onClick={openSwipe}>Find an opponent</BigButton>
+        <BigButton onClick={quickMatch}>Quick Match · live opponent</BigButton>
+        <BigButton tone="ghost" onClick={openSwipe}>Browse opponents</BigButton>
         <BigButton tone="ghost" onClick={startSolo}>Solo practice</BigButton>
         <DepositLink
           onClick={() => { setDepositing(true); deposit(1000); setTimeout(() => setDepositing(false), 600); }}
