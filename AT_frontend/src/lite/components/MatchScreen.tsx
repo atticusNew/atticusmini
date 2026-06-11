@@ -5,9 +5,9 @@ import { useSynchronizedPrice } from '../../hooks/useGlobalPriceFeed';
 import { pricingEngine } from '../../services/OffChainPricingEngine';
 import { useNow } from '../hooks/useNow';
 import { MatchChart, type StrikeMark } from './MatchChart';
-import { Screen, TopBar, Brand, Avatar, BigButton } from './ui';
+import { Screen, TopBar, Brand, BigButton } from './ui';
 import {
-  bothClosed, closeSide, effectivePnlUSD, isExpired, isInTheMoney, livePnlUSD, openSide,
+  bothClosed, closeSide, effectivePnlUSD, isExpired, livePnlUSD, openSide,
   secondsRemaining, settleMatch,
 } from '../services/matchEngine';
 import { chooseDirection, shouldSell } from '../services/botStrategy';
@@ -26,57 +26,31 @@ const Body = styled.div`
   min-height: 0;
 `;
 
-const Scoreboard = styled.div`
+const ScoreBar = styled.div`
   display: grid;
   grid-template-columns: 1fr auto 1fr;
-  align-items: stretch;
-  gap: 8px;
-`;
-
-const SideCard = styled.div<{ side: 'you' | 'opp'; lead: boolean }>`
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 10px;
-  border-radius: 14px;
-  border: 2px solid ${p => (p.lead ? 'var(--border-strong)' : 'var(--border)')};
-  background: ${p => (p.lead ? 'var(--bg-elev)' : 'var(--bg-elev-2)')};
-  box-shadow: ${p => (p.lead ? 'var(--shadow-hard)' : 'none')};
-  align-items: ${p => (p.side === 'opp' ? 'flex-end' : 'flex-start')};
-  transition: 120ms ease-out;
-  position: relative;
-  .top { display: flex; align-items: center; gap: 8px; flex-direction: ${p => (p.side === 'opp' ? 'row-reverse' : 'row')}; }
-  .name { font-family: var(--font-display); font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 6px; }
-  .dot { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--border-strong); }
-  .pnl { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 800; font-size: 22px; }
-  .tag { font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
-`;
-
-const Crown = styled.div<{ side: 'you' | 'opp' }>`
-  position: absolute;
-  top: -10px;
-  ${p => (p.side === 'opp' ? 'right: 8px;' : 'left: 8px;')}
-  font-size: 16px;
-`;
-
-const DirPill = styled.span<{ dir: Direction | null }>`
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  padding: 2px 8px;
-  border-radius: 999px;
-  border: 1.5px solid var(--border-strong);
-  color: #fff;
-  background: ${p => (p.dir === 'up' ? 'var(--up)' : p.dir === 'down' ? 'var(--down)' : 'var(--text-muted)')};
-`;
-
-const CenterCol = styled.div`
-  display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
-  min-width: 52px;
+  gap: 10px;
+`;
+
+const ScoreSide = styled.div<{ side: 'you' | 'opp'; lead: boolean }>`
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  align-items: ${p => (p.side === 'opp' ? 'flex-end' : 'flex-start')};
+  background: ${p => (p.lead ? 'var(--bg-elev)' : 'transparent')};
+  border: 2px solid ${p => (p.lead ? 'var(--border-strong)' : 'transparent')};
+  transition: 120ms ease-out;
+  .name {
+    display: flex; align-items: center; gap: 6px;
+    flex-direction: ${p => (p.side === 'opp' ? 'row-reverse' : 'row')};
+    font-family: var(--font-display); font-weight: 700; font-size: 13px; color: var(--text);
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .dot { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--border-strong); flex-shrink: 0; }
+  .pnl { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 800; font-size: 20px; }
 `;
 
 const Vs = styled.div`
@@ -91,15 +65,17 @@ const Vs = styled.div`
   box-shadow: 2px 2px 0 var(--border-strong);
 `;
 
-const LiveClock = styled.div<{ tone: 'normal' | 'warn' | 'critical' }>`
+const CenterClock = styled.div<{ tone: 'normal' | 'warn' | 'critical' }>`
   font-family: var(--font-display);
   font-variant-numeric: tabular-nums;
   font-weight: 700;
-  font-size: 30px;
+  font-size: 34px;
   line-height: 1;
+  text-align: center;
   color: ${p => (p.tone === 'critical' ? 'var(--down)' : p.tone === 'warn' ? 'var(--accent)' : 'var(--text)')};
-  -webkit-text-stroke: 0.8px var(--border-strong);
+  -webkit-text-stroke: 0.9px var(--border-strong);
   animation: ${p => (p.tone === 'critical' ? 'litePulse 0.6s ease-in-out infinite' : 'none')};
+  span { font-size: 14px; -webkit-text-stroke: 0; color: var(--text-dim); }
 `;
 
 const ChartFrame = styled.div`
@@ -273,33 +249,26 @@ export const MatchScreen: React.FC = () => {
     strikes.push({ price: match.opp.strikeUSD, entrySpot: match.opp.entrySpot, entryAt: match.opp.entryAt, direction: match.opp.direction, label: match.opp.name, you: false });
   }
 
-  const youITM = isInTheMoney(match.you, spot);
-  const oppITM = isInTheMoney(match.opp, spot);
-
   const chartSeries = live
     ? seriesRef.current
     : pricingEngine.getPriceHistory(0.6).map(h => ({ t: h.timestamp, p: h.price }));
 
   const armRemaining = Math.max(0, Math.ceil(ARM_SECONDS - (now - armRef.current.at) / 1000));
 
-  const renderSide = (side: MatchSide, who: 'you' | 'opp', pnl: number, itm: boolean, lead: boolean, color: string, name: string) => (
-    <SideCard side={who} lead={lead && live}>
-      {lead && live && <Crown side={who}>👑</Crown>}
-      <div className="top">
-        <Avatar src={side.avatar} size={34} />
-        <span className="name"><span className="dot" style={{ background: color }} />{name}</span>
-      </div>
-      <DirPill dir={side.direction}>{side.direction === 'up' ? '▲ HIGH' : side.direction === 'down' ? '▼ LOW' : 'PICK'}</DirPill>
-      <span className="pnl" style={{ color: pnl >= 0 ? 'var(--up)' : 'var(--down)' }}>
-        {side.direction ? fmt(pnl) : '—'}
-      </span>
-      {live && side.direction && (
-        <span className="tag" style={{ color: itm ? 'var(--up)' : 'var(--down)' }}>
-          {itm ? '● in the money' : '○ out of money'}
+  const renderSide = (side: MatchSide, who: 'you' | 'opp', pnl: number, lead: boolean, color: string, name: string) => {
+    const arrow = side.direction === 'up' ? '▲ ' : side.direction === 'down' ? '▼ ' : '';
+    return (
+      <ScoreSide side={who} lead={lead && live}>
+        <span className="name">
+          <span className="dot" style={{ background: color }} />
+          {name}{lead && live ? ' 👑' : ''}
         </span>
-      )}
-    </SideCard>
-  );
+        <span className="pnl" style={{ color: pnl >= 0 ? 'var(--up)' : 'var(--down)' }}>
+          {side.direction ? `${arrow}${fmt(pnl)}` : '—'}
+        </span>
+      </ScoreSide>
+    );
+  };
 
   return (
     <Screen>
@@ -309,23 +278,18 @@ export const MatchScreen: React.FC = () => {
       </TopBar>
 
       <Body>
-        <Scoreboard>
-          {renderSide(match.you, 'you', youPnl, youITM, youLead, YOU_COLOR, match.you.name)}
-          <CenterCol>
-            {live ? <LiveClock tone={tone}>{sec}s</LiveClock> : <Vs>VS</Vs>}
-          </CenterCol>
+        <ScoreBar>
+          {renderSide(match.you, 'you', youPnl, youLead, YOU_COLOR, match.you.name)}
+          {live ? <CenterClock tone={tone}>{sec}<span>s</span></CenterClock> : <Vs>VS</Vs>}
           {match.mode === 'pvp'
-            ? renderSide(match.opp, 'opp', oppPnl, oppITM, oppLead, OPP_COLOR, match.opp.name)
+            ? renderSide(match.opp, 'opp', oppPnl, oppLead, OPP_COLOR, match.opp.name)
             : (
-              <SideCard side="opp" lead={false}>
-                <div className="top" style={{ justifyContent: 'flex-end' }}>
-                  <span className="name">Solo</span>
-                </div>
-                <DirPill dir={null}>BEAT $0</DirPill>
-                <span className="pnl" style={{ color: 'var(--text-dim)' }}>$0.00</span>
-              </SideCard>
+              <ScoreSide side="opp" lead={false}>
+                <span className="name">Solo</span>
+                <span className="pnl" style={{ color: 'var(--text-dim)' }}>beat $0</span>
+              </ScoreSide>
             )}
-        </Scoreboard>
+        </ScoreBar>
 
         <ChartFrame>
           <MatchChart
