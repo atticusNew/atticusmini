@@ -14,7 +14,7 @@ import { chooseDirection, shouldSell } from '../services/botStrategy';
 import { haptics } from '../services/haptics';
 import type { Direction, MatchSide, MatchState } from '../types';
 
-const ARM_SECONDS = 5;
+const ARM_SECONDS = 10;
 const YOU_COLOR = '#ffd23f';
 const OPP_COLOR = '#41d7ff';
 
@@ -30,12 +30,16 @@ const Body = styled.div`
 const UserChip = styled.div`
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
-  .quit { cursor: pointer; font-size: 20px; font-weight: 700; color: var(--text); padding-right: 2px; }
+  .meta { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
   .uname {
-    font-family: var(--font-display); font-weight: 700; font-size: 15px; color: var(--text);
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px;
+    font-family: var(--font-display); font-weight: 700; font-size: 18px; color: var(--text);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px; line-height: 1.1;
+  }
+  .ubal {
+    font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 700;
+    font-size: 12px; color: var(--text-dim);
   }
 `;
 
@@ -49,24 +53,25 @@ const ScoreBar = styled.div`
 const ScoreSide = styled.div<{ side: 'you' | 'opp'; lead: boolean }>`
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 8px 10px;
-  border-radius: 12px;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: 14px;
   align-items: ${p => (p.side === 'opp' ? 'flex-end' : 'flex-start')};
-  border: 2px solid transparent;
-  /* Non-jarring lead cue: a soft fade, no size/border layout shift. */
-  background: ${p => (p.lead ? 'var(--bg-elev)' : 'transparent')};
-  box-shadow: ${p => (p.lead ? 'inset 0 0 0 2px var(--accent)' : 'none')};
-  transition: background 220ms ease, box-shadow 220ms ease;
+  background: var(--bg-elev);
+  border: 2px solid var(--border-strong);
+  /* Lead cue: accent fill ring + lift, smooth (no layout shift). */
+  box-shadow: ${p => (p.lead ? 'inset 0 0 0 3px var(--accent), var(--shadow-hard)' : '2px 2px 0 var(--border-strong)')};
+  transition: box-shadow 220ms ease;
   .name {
     display: flex; align-items: center; gap: 6px;
     flex-direction: ${p => (p.side === 'opp' ? 'row-reverse' : 'row')};
-    font-family: var(--font-display); font-weight: 700; font-size: 13px; color: var(--text);
+    font-family: var(--font-display); font-weight: 700; font-size: 14px; color: var(--text);
     max-width: 100%; overflow: hidden; white-space: nowrap;
   }
-  .dot { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--border-strong); flex-shrink: 0; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--border-strong); flex-shrink: 0; }
   .crown { width: 16px; text-align: center; flex-shrink: 0; }
-  .pnl { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 800; font-size: 20px; }
+  .lbl { font-size: 9px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+  .pnl { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 800; font-size: 23px; line-height: 1; }
 `;
 
 const Vs = styled.div`
@@ -148,6 +153,24 @@ const ChartFrame = styled.div`
   min-height: 0;
 `;
 
+const BtcTag = styled.div`
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(20, 15, 40, 0.78);
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(2px);
+  .lbl { font-family: var(--font-display); font-weight: 700; font-size: 11px; color: #c9b8ff; letter-spacing: 0.08em; }
+  .val { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 800; font-size: 16px; color: #fff; }
+`;
+
 const pulseRing = keyframes`
   0% { transform: scale(0.92); }
   50% { transform: scale(1.04); }
@@ -183,10 +206,23 @@ const ArmRing = styled.div<{ crit: boolean }>`
 const ArmHint = styled.div`
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 16px;
+  font-size: 19px;
   color: #fff;
-  text-shadow: 0 2px 6px rgba(0,0,0,0.5);
-  letter-spacing: 0.04em;
+  text-shadow: 0 2px 6px rgba(0,0,0,0.55);
+  letter-spacing: 0.02em;
+  text-align: center;
+`;
+
+const ArmSub = styled.div`
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #fff;
+  text-align: center;
+  text-shadow: 0 2px 6px rgba(0,0,0,0.6);
+  max-width: 280px;
+  b { font-weight: 800; }
 `;
 
 const Pot = styled.div`
@@ -214,7 +250,7 @@ const recentReturn = (): number => {
 };
 
 export const MatchScreen: React.FC = () => {
-  const { match, opponent, setMatch, commitResult, goLobby } = useLiteSession();
+  const { match, opponent, balance, setMatch, commitResult } = useLiteSession();
   const { priceState } = useSynchronizedPrice();
   const spot = priceState.current;
   const live = match?.phase === 'live';
@@ -335,6 +371,7 @@ export const MatchScreen: React.FC = () => {
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</span>
           <span className="crown">{lead ? '👑' : ''}</span>
         </span>
+        <span className="lbl">{side.direction ? (side.direction === 'up' ? 'HIGH · P/L' : 'LOW · P/L') : 'profit/loss'}</span>
         <span className="pnl" style={{ color: pnl >= 0 ? 'var(--up)' : 'var(--down)' }}>
           {side.direction ? `${arrow}${fmt(pnl)}` : '—'}
         </span>
@@ -346,9 +383,11 @@ export const MatchScreen: React.FC = () => {
     <Screen>
       <TopBar>
         <UserChip>
-          <span className="quit" onClick={goLobby}>←</span>
-          <Avatar src={match.you.avatar} size={30} />
-          <span className="uname">{match.you.name}</span>
+          <Avatar src={match.you.avatar} size={36} />
+          <div className="meta">
+            <span className="uname">{match.you.name}</span>
+            <span className="ubal">${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          </div>
         </UserChip>
         {live
           ? <TopTimer tone={tone}><span className="n">{sec}</span><span className="u">sec</span></TopTimer>
@@ -360,6 +399,12 @@ export const MatchScreen: React.FC = () => {
 
       <Body>
         <ChartFrame>
+          {spot > 0 && (
+            <BtcTag>
+              <span className="lbl">BTC</span>
+              <span className="val">${spot.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
+            </BtcTag>
+          )}
           <MatchChart
             series={chartSeries}
             now={now}
@@ -371,13 +416,15 @@ export const MatchScreen: React.FC = () => {
           />
           {match.phase === 'arming' && (
             <ArmOverlay>
-              <ArmHint>PICK A SIDE</ArmHint>
-              <ArmRing crit={armRemaining <= 2}>
+              <ArmHint>Will BTC go up or down?</ArmHint>
+              <ArmRing crit={armRemaining <= 3}>
                 <span className="n">{armRemaining}</span>
               </ArmRing>
-              <ArmHint style={{ fontSize: 13, opacity: 0.85 }}>
-                {spot > 0 ? 'HIGH or LOW before the clock hits 0' : 'waiting for price…'}
-              </ArmHint>
+              <ArmSub>
+                {spot > 0
+                  ? <>Tap <b style={{ color: 'var(--up)' }}>HIGH</b> or <b style={{ color: 'var(--down)' }}>LOW</b> below to lock your entry.<br />Most profit after 30s wins{match.mode === 'pvp' ? ' the wager.' : '.'}</>
+                  : 'Waiting for the live price…'}
+              </ArmSub>
             </ArmOverlay>
           )}
         </ChartFrame>
