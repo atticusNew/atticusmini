@@ -71,7 +71,7 @@ export const Brand = styled.div`
 
 /** bitMATCH wordmark used in screen headers (top-left). */
 export const Logo = styled.img`
-  height: 28px;
+  height: 38px;
   width: auto;
   display: block;
 `;

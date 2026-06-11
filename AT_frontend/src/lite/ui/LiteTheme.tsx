@@ -112,13 +112,23 @@ const LiteGlobal = createGlobalStyle`
  */
 export const LiteTheme: React.FC = () => {
   useEffect(() => {
-    const id = 'lite-fonts';
-    if (document.getElementById(id)) return;
-    const link = document.createElement('link');
-    link.id = id;
-    link.rel = 'stylesheet';
-    link.href = FONT_HREF;
-    document.head.appendChild(link);
+    // Retro display font (kept out of the shared index.html).
+    if (!document.getElementById('lite-fonts')) {
+      const link = document.createElement('link');
+      link.id = 'lite-fonts';
+      link.rel = 'stylesheet';
+      link.href = FONT_HREF;
+      document.head.appendChild(link);
+    }
+
+    // bitMATCH favicon + tab title — scoped to the Lite route so the main
+    // app's favicon/title are unaffected (route changes trigger a full load).
+    const icon = (document.querySelector("link[rel~='icon']") as HTMLLinkElement | null)
+      ?? Object.assign(document.createElement('link'), { rel: 'icon' });
+    if (!icon.parentNode) document.head.appendChild(icon);
+    icon.type = 'image/png';
+    icon.href = '/images/lite-logo.png';
+    document.title = 'bitMATCH';
   }, []);
 
   return <LiteGlobal />;
