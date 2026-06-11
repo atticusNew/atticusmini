@@ -8,6 +8,7 @@ import {
   MAX_AMOUNT_USD, MAX_WAGER_USD, MIN_AMOUNT_USD, MIN_WAGER_USD,
 } from '../services/matchEngine';
 import { winRate } from '../services/profileService';
+import { ProfileMenu } from './ProfileMenu';
 
 const ProfileCard = styled.div`
   display: flex;
@@ -112,6 +113,7 @@ export const LobbyScreen: React.FC = () => {
     profile, balance, wagerUSD, amountUSD, setWager, setAmount, deposit, openSwipe, startSolo,
   } = useLiteSession();
   const [depositing, setDepositing] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const wr = profile ? Math.round(winRate(profile.stats) * 100) : 0;
 
@@ -124,11 +126,18 @@ export const LobbyScreen: React.FC = () => {
 
       <ScreenBody>
         {profile && (
-          <ProfileCard>
+          <ProfileCard
+            role="button"
+            tabIndex={0}
+            onClick={() => setMenuOpen(true)}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setMenuOpen(true); }}
+            style={{ cursor: 'pointer' }}
+            aria-label="Open profile and settings"
+          >
             <Avatar src={profile.avatar} size={56} />
             <div className="meta">
-              <span className="name">{profile.name}</span>
-              <span className="bio">{profile.bio || 'Ready to trade.'}</span>
+              <span className="name">{profile.name} <span style={{ color: 'var(--text-dim)', fontWeight: 600, fontSize: 13 }}>⚙</span></span>
+              <span className="bio">{profile.bio || 'Tap to edit profile & settings'}</span>
               <StatRow>
                 <span>streak <span className="v">{profile.stats.streak}</span></span>
                 <span>wins <span className="v">{profile.stats.wins}</span></span>
@@ -182,6 +191,8 @@ export const LobbyScreen: React.FC = () => {
           {depositing ? 'Funds added ✓' : '+ Add demo funds'}
         </DepositLink>
       </ScreenBody>
+
+      {menuOpen && <ProfileMenu onClose={() => setMenuOpen(false)} />}
     </Screen>
   );
 };

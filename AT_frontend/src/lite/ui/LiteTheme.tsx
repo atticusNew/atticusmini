@@ -127,7 +127,7 @@ export const LiteTheme: React.FC = () => {
       ?? Object.assign(document.createElement('link'), { rel: 'icon' });
     if (!icon.parentNode) document.head.appendChild(icon);
     icon.type = 'image/png';
-    icon.href = '/images/lite-logo.png';
+    icon.href = '/images/bitmatch-icon.png';
     document.title = 'bitMATCH';
   }, []);
 

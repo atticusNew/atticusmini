@@ -4,6 +4,8 @@
  * devices and when the user prefers reduced motion.
  */
 
+import { getSetting } from './settings';
+
 const canVibrate = (): boolean =>
   typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
 
@@ -12,7 +14,7 @@ const reducedMotion = (): boolean =>
   !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 const buzz = (pattern: number | number[]): void => {
-  if (!canVibrate() || reducedMotion()) return;
+  if (!canVibrate() || reducedMotion() || !getSetting('haptics')) return;
   try { navigator.vibrate(pattern); } catch { /* ignore */ }
 };
 

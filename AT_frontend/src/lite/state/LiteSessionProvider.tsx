@@ -13,9 +13,11 @@ import type {
   Opponent,
 } from '../types';
 import {
+  clearProfile,
   createProfile,
   loadProfile,
   recordOutcome,
+  saveProfile,
   type CreateProfileInput,
 } from '../services/profileService';
 import { liteWallet } from '../services/liteWallet';
@@ -27,6 +29,7 @@ import {
 } from '../services/matchEngine';
 
 export type LiteScreen =
+  | 'landing'
   | 'onboarding'
   | 'lobby'
   | 'swipe'
@@ -44,7 +47,11 @@ interface LiteSessionValue {
   opponent: Opponent | null;
   match: MatchState | null;
 
+  start: () => void;
   completeOnboarding: (input: CreateProfileInput) => void;
+  updateProfile: (patch: Partial<Pick<LiteProfile, 'name' | 'bio' | 'avatar'>>) => void;
+  resetBalance: () => void;
+  signOut: () => void;
   setWager: (n: number) => void;
   setAmount: (n: number) => void;
   deposit: (amountUSD: number) => void;
@@ -75,15 +82,49 @@ export const LiteSessionProvider: React.FC<{ children: ReactNode }> = ({ childre
   const [balance, setBalance] = useState<number>(() => liteWallet.getBalance());
   const [wagerUSD, setWagerState] = useState(25);
   const [amountUSD, setAmountState] = useState(10);
-  const [screen, setScreen] = useState<LiteScreen>(initialProfile ? 'lobby' : 'onboarding');
+  const [screen, setScreen] = useState<LiteScreen>('landing');
   const [deck, setDeck] = useState<Opponent[]>([]);
   const [opponent, setOpponent] = useState<Opponent | null>(null);
   const [match, setMatchState] = useState<MatchState | null>(null);
+
+  const start = useCallback(() => {
+    setScreen(loadProfile() ? 'lobby' : 'onboarding');
+  }, []);
 
   const completeOnboarding = useCallback((input: CreateProfileInput) => {
     const p = createProfile(input);
     setProfile(p);
     setScreen('lobby');
+  }, []);
+
+  const updateProfile = useCallback(
+    (patch: Partial<Pick<LiteProfile, 'name' | 'bio' | 'avatar'>>) => {
+      setProfile(prev => {
+        if (!prev) return prev;
+        const next: LiteProfile = {
+          ...prev,
+          ...(patch.name !== undefined ? { name: patch.name.trim().slice(0, 24) || prev.name } : {}),
+          ...(patch.bio !== undefined ? { bio: patch.bio.trim().slice(0, 120) } : {}),
+          ...(patch.avatar !== undefined ? { avatar: patch.avatar } : {}),
+        };
+        saveProfile(next);
+        return next;
+      });
+    },
+    [],
+  );
+
+  const resetBalance = useCallback(() => {
+    liteWallet.reset();
+    setBalance(liteWallet.getBalance());
+  }, []);
+
+  const signOut = useCallback(() => {
+    clearProfile();
+    setProfile(null);
+    setOpponent(null);
+    setMatchState(null);
+    setScreen('onboarding');
   }, []);
 
   const setWager = useCallback((n: number) => setWagerState(clampWager(n)), []);
@@ -172,7 +213,11 @@ export const LiteSessionProvider: React.FC<{ children: ReactNode }> = ({ childre
       deck,
       opponent,
       match,
+      start,
       completeOnboarding,
+      updateProfile,
+      resetBalance,
+      signOut,
       setWager,
       setAmount,
       deposit,
@@ -187,7 +232,8 @@ export const LiteSessionProvider: React.FC<{ children: ReactNode }> = ({ childre
     }),
     [
       screen, profile, balance, wagerUSD, amountUSD, deck, opponent, match,
-      completeOnboarding, setWager, setAmount, deposit, goLobby, openSwipe,
+      start, completeOnboarding, updateProfile, resetBalance, signOut,
+      setWager, setAmount, deposit, goLobby, openSwipe,
       challenge, enterMatch, startSolo, setMatch, commitResult, rematch,
     ],
   );

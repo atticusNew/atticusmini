@@ -11,6 +11,7 @@ import React from 'react';
 import { LiteTheme } from './ui/LiteTheme';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { LiteSessionProvider, useLiteSession } from './state/LiteSessionProvider';
+import { LandingScreen } from './components/LandingScreen';
 import { OnboardingScreen } from './components/OnboardingScreen';
 import { LobbyScreen } from './components/LobbyScreen';
 import { SwipeDeck } from './components/SwipeDeck';
@@ -21,6 +22,7 @@ import { ResultScreen } from './components/ResultScreen';
 const LiteRouter: React.FC = () => {
   const { screen } = useLiteSession();
   switch (screen) {
+    case 'landing': return <LandingScreen />;
     case 'onboarding': return <OnboardingScreen />;
     case 'lobby': return <LobbyScreen />;
     case 'swipe': return <SwipeDeck />;
